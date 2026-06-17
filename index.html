@@ -1,0 +1,1978 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>建築の点群データはどこへ行く — 測定から活用までの道のり</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --teal: #0d9488;
+        --teal-dark: #0f766e;
+        --orange: #f97316;
+        --orange-soft: #ffedd5;
+        --bg: #f8fafc;
+        --card: #ffffff;
+        --border: #e2e8f0;
+        --text: #0f172a;
+        --text-sub: #64748b;
+        --shadow-sm:
+          0 1px 2px 0 rgba(15, 23, 42, 0.06), 0 1px 3px 0 rgba(15, 23, 42, 0.08);
+        --shadow-md: 0 4px 12px -2px rgba(15, 23, 42, 0.1);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: var(--bg);
+        color: var(--text);
+        font-family:
+          "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+          sans-serif;
+        font-weight: 400;
+        line-height: 1.7;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* 記号的要素（ラベル/番号/バッジ/補足）だけ等幅を維持 */
+      .kicker,
+      .stage-num,
+      .badge-star,
+      .scroll-hint,
+      .node .meta,
+      .decim-meta,
+      .canvas-meta .esr-label,
+      .stat-row,
+      .replay,
+      code {
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+      }
+
+      body {
+        min-height: 100vh;
+        min-height: 100dvh;
+      }
+
+      /* 日本語の改行を文節単位にして語中での分断・孤立文字を防ぐ */
+      .hero h1,
+      .lead,
+      .stage .sub,
+      .node .desc,
+      .node .nlabel,
+      .decim-hero .desc,
+      .branch-label,
+      .trend-body p,
+      .canvas-cap,
+      footer .wrap {
+        word-break: auto-phrase;
+        line-break: strict;
+        text-wrap: pretty;
+      }
+
+      a {
+        color: var(--teal);
+        text-decoration: none;
+        border-bottom: 1px dotted var(--teal);
+      }
+      a:hover {
+        color: var(--teal-dark);
+      }
+
+      /* ===== Layout ===== */
+      .wrap {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 0 20px;
+      }
+
+      /* ===== Progress bar ===== */
+      #progress {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 4px;
+        width: 0%;
+        background: linear-gradient(90deg, var(--teal), var(--orange));
+        z-index: 100;
+        transition: width 0.1s linear;
+      }
+
+      /* ===== Hero ===== */
+      .hero {
+        min-height: 92vh;
+        min-height: 92dvh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 80px 20px 60px;
+        text-align: center;
+      }
+      .hero .wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .kicker {
+        display: inline-block;
+        font-size: 12px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--orange);
+        font-weight: 700;
+        border: 1px solid var(--orange);
+        border-radius: 999px;
+        padding: 6px 14px;
+        margin-bottom: 24px;
+      }
+      .hero h1 {
+        font-size: clamp(28px, 5.5vw, 52px);
+        font-weight: 700;
+        margin: 0 0 18px;
+        line-height: 1.25;
+        letter-spacing: -0.01em;
+        text-wrap: balance;
+      }
+      .hero h1 .accent {
+        color: var(--orange);
+      }
+      .hero p.lead {
+        font-size: clamp(14px, 2.2vw, 18px);
+        color: var(--text-sub);
+        max-width: 680px;
+        margin: 0 auto 36px;
+      }
+      .scroll-hint {
+        color: var(--text-sub);
+        font-size: 12px;
+        letter-spacing: 0.1em;
+      }
+      .scroll-hint .arrow {
+        display: block;
+        font-size: 22px;
+        margin-top: 8px;
+        animation: bob 1.8s ease-in-out infinite;
+      }
+      @keyframes bob {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(8px);
+        }
+      }
+
+      /* legend chips */
+      .legend {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-top: 8px;
+      }
+      .legend .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 12px;
+        color: var(--text-sub);
+      }
+      .legend .dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 3px;
+        display: inline-block;
+      }
+      .dot.teal {
+        background: var(--teal);
+      }
+      .dot.orange {
+        background: var(--orange);
+      }
+      .dot.star {
+        background: var(--orange);
+        box-shadow: 0 0 0 3px var(--orange-soft);
+      }
+
+      /* ===== Stage header ===== */
+      .stage {
+        padding: 56px 0 24px;
+      }
+      .stage-head {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        margin-bottom: 8px;
+        flex-wrap: wrap;
+      }
+      .stage-num {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--card);
+        background: var(--teal);
+        border-radius: 8px;
+        padding: 4px 10px;
+        letter-spacing: 0.08em;
+      }
+      .stage h2 {
+        font-size: clamp(22px, 4vw, 34px);
+        font-weight: 700;
+        margin: 0;
+      }
+      .stage .sub {
+        color: var(--text-sub);
+        font-size: 14px;
+        margin: 6px 0 0;
+        max-width: 760px;
+      }
+
+      /* ===== reveal animation ===== */
+      .reveal {
+        opacity: 0;
+        transform: translateY(28px);
+        transition:
+          opacity 0.7s ease-out,
+          transform 0.7s ease-out;
+      }
+      .reveal.in {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      /* ===== Cards ===== */
+      .node {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        box-shadow: var(--shadow-sm);
+        padding: 20px 22px;
+        transition:
+          box-shadow 0.25s ease,
+          transform 0.25s ease;
+      }
+      .node:hover {
+        box-shadow: var(--shadow-md);
+        transform: translateY(-2px);
+      }
+      .node .nlabel {
+        font-size: 18px;
+        font-weight: 700;
+        margin: 0 0 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .node .desc {
+        font-size: 14px;
+        color: var(--text-sub);
+        margin: 0 0 14px;
+      }
+      .node .meta {
+        font-size: 12px;
+        color: var(--text-sub);
+        display: grid;
+        gap: 5px;
+      }
+      .node .meta .row {
+        display: flex;
+        gap: 8px;
+      }
+      .node .meta .k {
+        color: var(--teal);
+        font-weight: 500;
+        flex: 0 0 64px;
+      }
+      .node .meta .v {
+        color: var(--text-sub);
+      }
+      .node .link {
+        margin-top: 12px;
+        font-size: 12px;
+      }
+
+      /* star node */
+      .node.star {
+        border: 1.5px solid var(--orange);
+        box-shadow:
+          0 0 0 4px var(--orange-soft),
+          var(--shadow-sm);
+      }
+      .node.star .nlabel {
+        color: var(--orange);
+      }
+      .node.star .meta .k {
+        color: var(--orange);
+      }
+      .badge-star {
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--card);
+        background: var(--orange);
+        border-radius: 6px;
+        padding: 2px 7px;
+        letter-spacing: 0.06em;
+      }
+
+      /* acquisition grid */
+      .grid-acq {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 16px;
+      }
+
+      /* connector arrow between stages / pipeline */
+      .merge-note {
+        text-align: center;
+        color: var(--text-sub);
+        font-size: 12px;
+        margin: 22px 0 6px;
+      }
+      .merge-note .down {
+        display: block;
+        font-size: 20px;
+        color: var(--teal);
+        margin-top: 2px;
+      }
+
+      /* preprocessing pipeline (vertical) */
+      .pipe {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0;
+      }
+      .pipe .node {
+        width: 100%;
+        max-width: 720px;
+      }
+      .pipe-arrow {
+        color: var(--teal);
+        font-size: 20px;
+        line-height: 1;
+        padding: 10px 0;
+      }
+      .pipe-arrow .tag {
+        font-size: 11px;
+        color: var(--text-sub);
+        margin-left: 8px;
+      }
+
+      /* decim hero block */
+      .decim-hero {
+        width: 100%;
+        max-width: 860px;
+        background: var(--card);
+        border: 1.5px solid var(--orange);
+        border-radius: 18px;
+        box-shadow:
+          0 0 0 5px var(--orange-soft),
+          var(--shadow-md);
+        padding: 26px 24px;
+        margin: 4px 0;
+      }
+      .decim-hero .top {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 6px;
+      }
+      .decim-hero h3 {
+        font-size: clamp(18px, 3vw, 24px);
+        font-weight: 700;
+        color: var(--orange);
+        margin: 0;
+      }
+      .decim-hero .desc {
+        font-size: 14px;
+        color: var(--text);
+        margin: 10px 0 18px;
+        max-width: 640px;
+      }
+
+      .canvas-shell {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+      @media (min-width: 720px) {
+        .canvas-shell {
+          grid-template-columns: 1.4fr 1fr;
+          align-items: center;
+        }
+      }
+      #decimCanvas {
+        width: 100%;
+        height: auto;
+        aspect-ratio: 3 / 2;
+        background: #0b1220;
+        border-radius: 12px;
+        display: block;
+      }
+      .canvas-cap {
+        grid-column: 1 / -1;
+        margin: 0;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-sub);
+        text-align: center;
+      }
+      .canvas-meta .esr-wrap {
+        margin-bottom: 14px;
+      }
+      .canvas-meta .esr-label {
+        font-size: 12px;
+        color: var(--text-sub);
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 5px;
+      }
+      .canvas-meta .esr-val {
+        font-weight: 700;
+      }
+      .bar {
+        height: 9px;
+        background: var(--border);
+        border-radius: 999px;
+        overflow: hidden;
+      }
+      .bar > span {
+        display: block;
+        height: 100%;
+        border-radius: 999px;
+        transition: width 0.4s ease;
+      }
+      .bar.member > span {
+        background: var(--orange);
+      }
+      .bar.overall > span {
+        background: var(--teal);
+      }
+      .stat-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        color: var(--text-sub);
+        margin-top: 4px;
+      }
+      .stat-row b {
+        color: var(--text);
+        font-weight: 700;
+      }
+      .replay {
+        margin-top: 16px;
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--card);
+        background: var(--teal);
+        border: none;
+        border-radius: 10px;
+        padding: 10px 16px;
+        cursor: pointer;
+        min-height: 40px;
+        transition: background 0.2s;
+      }
+      .replay:hover {
+        background: var(--teal-dark);
+      }
+      .decim-meta {
+        font-size: 12px;
+        color: var(--text-sub);
+        display: grid;
+        gap: 5px;
+        margin-top: 18px;
+        border-top: 1px dashed var(--border);
+        padding-top: 14px;
+      }
+      .decim-meta .row {
+        display: flex;
+        gap: 8px;
+      }
+      .decim-meta .k {
+        color: var(--orange);
+        font-weight: 500;
+        flex: 0 0 64px;
+      }
+
+      /* outputs */
+      .out-group {
+        margin-top: 20px;
+      }
+      .out-group > .branch-label {
+        font-size: 12px;
+        color: var(--text-sub);
+        margin: 0 0 12px;
+        border-left: 3px solid var(--orange);
+        padding-left: 10px;
+      }
+      .grid-out {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 16px;
+      }
+
+      /* footer */
+      footer {
+        padding: 48px 20px 64px;
+        text-align: center;
+        color: var(--text-sub);
+        font-size: 12px;
+      }
+      footer .wrap {
+        border-top: 1px solid var(--border);
+        padding-top: 28px;
+      }
+      footer b {
+        color: var(--text);
+      }
+
+      /* edge label pill inside cards list */
+      .edge-pill {
+        font-size: 11px;
+        color: var(--teal);
+        background: #e6fffb00;
+      }
+
+      /* ===== details/summary: 最新動向 fold ===== */
+      .trend {
+        margin-top: 14px;
+        border-top: 1px dashed var(--border);
+        padding-top: 10px;
+      }
+      .trend summary {
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--orange);
+        letter-spacing: 0.05em;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        user-select: none;
+        padding: 2px 0;
+      }
+      .trend summary::-webkit-details-marker {
+        display: none;
+      }
+      .trend summary::before {
+        content: "▶";
+        font-size: 9px;
+        transition: transform 0.15s ease;
+        display: inline-block;
+      }
+      .trend[open] summary::before {
+        transform: rotate(90deg);
+      }
+      .trend-body {
+        margin-top: 10px;
+        font-size: 12px;
+        color: var(--text-sub);
+        display: grid;
+        gap: 6px;
+        overflow-x: hidden;
+        word-break: break-word;
+      }
+      .trend-body p {
+        margin: 0;
+        line-height: 1.65;
+      }
+      .trend-body .t-label {
+        color: var(--orange);
+        font-weight: 600;
+      }
+      .trend-body a {
+        font-size: 11px;
+        word-break: break-all;
+      }
+      /* star node: trendラベルをorange系に合わせる */
+      .node.star .trend summary {
+        color: var(--orange);
+      }
+      /* decim-hero 内の trend は背景になじませる */
+      .decim-hero .trend {
+        border-top-color: rgba(249, 115, 22, 0.3);
+        margin-top: 16px;
+        padding-top: 12px;
+      }
+
+      /* ===== reduced-motion: respect users sensitive to motion ===== */
+      @media (prefers-reduced-motion: reduce) {
+        .scroll-hint .arrow {
+          animation: none;
+        }
+        .reveal {
+          opacity: 1;
+          transform: none;
+          transition: none;
+        }
+        .node {
+          transition: none;
+        }
+        .trend summary::before {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="progress"></div>
+
+    <!-- ===================== HERO ===================== -->
+    <header class="hero">
+      <div class="wrap">
+        <span class="kicker">建築 / 文化財 点群リサーチ</span>
+        <h1>
+          建築の点群データの<span class="accent">一生</span
+          >　―　測定からどんな使い方へ辿り着くか
+        </h1>
+        <p class="lead">
+          点の集まりで作った3Dデータ（点群）が、
+          <b>測定 → 下ごしらえ → 活用</b
+          >という旅をどう辿るのかを上から下へ追います。旅の山場は<span
+            style="color: var(--orange); font-weight: 700"
+            >データを軽くする（軽量化）</span
+          >こと。
+          点の数を減らしても「残すべき柱や梁の情報」をどこまで保てるか——本研究が検証している分岐点です。
+        </p>
+        <div class="legend">
+          <span class="chip"
+            ><span class="dot teal"></span>通常の処理ステップ</span
+          >
+          <span class="chip"
+            ><span class="dot star"></span>★ 本研究が一番力を発揮する場所</span
+          >
+          <span class="chip"
+            ><span class="dot orange"></span>残すべき柱・梁など / 強調</span
+          >
+        </div>
+        <div class="scroll-hint" style="margin-top: 34px">
+          SCROLL
+          <span class="arrow">↓</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ===================== ① 取得 ===================== -->
+    <section class="stage">
+      <div class="wrap">
+        <div class="stage-head reveal">
+          <span class="stage-num">STAGE 01</span>
+          <h2>測定 — 建物を3Dデータに変える</h2>
+        </div>
+        <p class="sub reveal">
+          現実の建物をレーザーやカメラで測って、点の集まりにする。精度・速さ・コスト・対象の大きさによって4つの方法を使い分け、すべては次の「データを重ね合わせる」ステップへまとまる。
+        </p>
+
+        <div class="grid-acq" style="margin-top: 24px">
+          <!-- acq_tls -->
+          <article class="node reveal">
+            <p class="nlabel">三脚据置レーザースキャナ（TLS）</p>
+            <p class="desc">
+              三脚に据えて建物の形を精密に測る機械。mm単位の最高精度だが、一箇所ずつ据え直すので時間がかかる。
+            </p>
+            <div class="meta">
+              <div class="row">
+                <span class="k">ツール</span
+                ><span class="v">Leica RTC360, FARO Focus, Trimble</span>
+              </div>
+              <div class="row">
+                <span class="k">形式</span
+                ><span class="v">E57 / PTX / RCS</span>
+              </div>
+            </div>
+            <div class="link">
+              <a
+                href="https://angellsurveys.com/insights/point-cloud-survey-capture-methods-compared/"
+                target="_blank"
+                rel="noopener"
+                >事例 →</a
+              >
+            </div>
+            <details class="trend">
+              <summary>最新動向 2025-26</summary>
+              <div class="trend-body">
+                <p>
+                  歩きながら測る方式（SLAM）との組み合わせが大型案件で標準的になってきた。三脚据置スキャナ単体は「動かさない・高精度な基準値」として、歩き測りの誤差を補正するアンカー役に専門化が進む。
+                </p>
+                <p>
+                  <span class="t-label">注目:</span> NavLive —
+                  AIが三脚スキャナの点群から1cm精度の2D図面を自動生成 (2024-25)
+                </p>
+                <p>
+                  <a
+                    href="https://aecmag.com/technology/navlive-scan-to-drawings/"
+                    target="_blank"
+                    rel="noopener"
+                    >NavLive Scan-to-Drawings →</a
+                  >
+                </p>
+              </div>
+            </details>
+          </article>
+          <!-- acq_mls -->
+          <article class="node reveal">
+            <p class="nlabel">歩きながら測るスキャナ（モバイル / SLAM）</p>
+            <p class="desc">
+              歩いたり車に積んで建物の形を素早く測る方式（＝歩きながら自分の位置を計算しつつ測っていく技術）。精度はmm単位から5〜10mm程度に落ちる分、速さが魅力。
+            </p>
+            <div class="meta">
+              <div class="row">
+                <span class="k">ツール</span
+                ><span class="v">Leica BLK2GO, NavVis VLX, GeoSLAM</span>
+              </div>
+              <div class="row">
+                <span class="k">形式</span><span class="v">E57 / LAS</span>
+              </div>
+            </div>
+            <div class="link">
+              <a
+                href="https://onlinelibrary.wiley.com/doi/full/10.1111/phor.12525"
+                target="_blank"
+                rel="noopener"
+                >事例 →</a
+              >
+            </div>
+            <details class="trend">
+              <summary>最新動向 2025-26</summary>
+              <div class="trend-body">
+                <p>
+                  NavVis VLX
+                  3は約9,300m²を4〜5時間でGPSなしに室内を連続測定できる（精度5mm台）。以前は三脚スキャナの補助役だったが、中精度・高速測定の主役へ昇格。
+                </p>
+                <p>
+                  <span class="t-label">注目:</span> DJI Terra
+                  V5.0が写真から本物そっくりの3D空間を作る新技術（Gaussian
+                  Splatting）に対応し、点群とGSを同時に出力できるようになった。
+                </p>
+                <p>
+                  <a
+                    href="https://www.thefuture3d.com/mobile-slam-scanning/"
+                    target="_blank"
+                    rel="noopener"
+                    >Mobile SLAM Scanning 2025 →</a
+                  >
+                </p>
+              </div>
+            </details>
+          </article>
+          <!-- acq_uav -->
+          <article class="node reveal">
+            <p class="nlabel">ドローンで上空から測る（UAV写真測量 / LiDAR）</p>
+            <p class="desc">
+              ドローンを飛ばして屋根や広い範囲を上空から測る。地上に置いた基準点（GCP）を使うと±20〜50mmの精度が出る。木の葉が茂った下も測れる。
+            </p>
+            <div class="meta">
+              <div class="row">
+                <span class="k">ツール</span
+                ><span class="v">DJI, Pix4D, Metashape</span>
+              </div>
+              <div class="row">
+                <span class="k">形式</span
+                ><span class="v">LAS / LAZ / E57</span>
+              </div>
+            </div>
+            <div class="link">
+              <a
+                href="https://www.jouav.com/blog/lidar-vs-photogrammetry.html"
+                target="_blank"
+                rel="noopener"
+                >事例 →</a
+              >
+            </div>
+
+            <details class="trend">
+              <summary>最新動向 2025-26</summary>
+              <div class="trend-body">
+                <p>
+                  ROCK Robotic R3 Pro V2、DJI Matrice 350
+                  RTK（高度300mで精度3〜5cm）が主力機。DJI Terra
+                  V5.0が2025年に点群と3D空間の同時生成を実用化。外観測量の結果を点群だけでなく見た目そっくりの3Dデータとしても同時に出せるようになった。
+                </p>
+                <p>
+                  <span class="t-label">注目:</span>
+                  建築の監査・屋根診断でドローンLiDAR単独のワークフローが定着してきた。
+                </p>
+                <p>
+                  <a
+                    href="https://www.rockrobotic.com/articles/choosing-the-best-drone-for-lidar-mapping-in-2025/"
+                    target="_blank"
+                    rel="noopener"
+                    >Drone LiDAR mapping 2025 →</a
+                  >
+                </p>
+              </div>
+            </details>
+          </article>
+          <!-- acq_phone -->
+          <article class="node reveal">
+            <p class="nlabel">スマホ / タブレットで測る</p>
+            <p class="desc">
+              手軽・安価でcm単位の精度がすぐ出る。小規模な測定や現地の下見向け。
+            </p>
+            <div class="meta">
+              <div class="row">
+                <span class="k">ツール</span
+                ><span class="v">Polycam, Matterport, Scaniverse</span>
+              </div>
+              <div class="row">
+                <span class="k">形式</span
+                ><span class="v">PLY / LAS / E57</span>
+              </div>
+            </div>
+            <div class="link">
+              <a
+                href="https://poly.cam/blog/how-to-georeference-polycam-scans-with-ground-control-points-in-cloudcompare-polycam"
+                target="_blank"
+                rel="noopener"
+                >事例 →</a
+              >
+            </div>
+
+            <details class="trend">
+              <summary>最新動向 2025-26</summary>
+              <div class="trend-body">
+                <p>
+                  iPhoneのレーザー測定は仕様が非公表で、4mを超えると精度が急に落ちる。KIRI
+                  Engine（2025年5月）がAIで粗さを後処理で補完し、簡単な実用範囲へ拡張した。概略確認レベル→レーザー+AI補完で簡易実用レベルへ。
+                </p>
+                <p>
+                  <span class="t-label">注目:</span> KIRI Engine —
+                  iPhoneのアップデートでAI補完の精度が向上 (2025/05)
+                </p>
+                <p>
+                  <a
+                    href="https://beforesandafters.com/2025/05/06/kiri-engines-new-iphone-update-uses-ai-to-fix-lidars-quality-limitations/"
+                    target="_blank"
+                    rel="noopener"
+                    >KIRI Engine AI fix →</a
+                  >
+                </p>
+              </div>
+            </details>
+          </article>
+        </div>
+
+        <p class="merge-note reveal">
+          4つの方法で測ったデータを、共通の1つの座標に統合<span class="down"
+            >↓</span
+          >
+        </p>
+      </div>
+    </section>
+
+    <!-- ===================== ② 前処理 ===================== -->
+    <section class="stage">
+      <div class="wrap">
+        <div class="stage-head reveal">
+          <span class="stage-num">STAGE 02</span>
+          <h2>下ごしらえ — データを使える形に整える</h2>
+        </div>
+        <p class="sub reveal">
+          測定した点群を使える形に整える、順番に処理する工程。中ほどの<span
+            style="color: var(--orange); font-weight: 700"
+            >データを軽くする</span
+          >ステップは、軽さと精度のトレードオフが問われる用途（ブラウザ配信・ひび割れ検知など）の手前で効く要所であり、本研究の本丸。
+        </p>
+
+        <div class="pipe" style="margin-top: 24px">
+          <!-- pre_reg -->
+          <article class="node reveal">
+            <p class="nlabel">バラバラに測ったデータをピタッと重ね合わせる</p>
+            <p class="desc">
+              複数回に分けて測ったデータを1つの座標に統合する。この後の全ての工程の土台になる。
+            </p>
+            <div class="meta">
+              <div class="row">
+                <span class="k">ツール</span
+                ><span class="v">Cyclone REGISTER, FARO SCENE, ReCap</span>
+              </div>
+              <div class="row">
+                <span class="k">形式</span><span class="v">E57 → RCP</span>
+              </div>
+            </div>
+            <div class="link">
+              <a
+                href="https://www.thefuture3d.com/blog/best-point-cloud-software-2026"
+                target="_blank"
+                rel="noopener"
+                >事例 →</a
+              >
+            </div>
+
+            <details class="trend">
+              <summary>最新動向 2025-26</summary>
+              <div class="trend-body">
+                <p>
+                  古典的なアルゴリズム（ICP）とAIを組み合わせた手法（GeoTransformer
+                  など）が2025年の主流。異なる種類のセンサーを自動でまとめることが課題。自動で対応点を検出する精度が従来の手法を大きく上回る。
+                </p>
+                <p>
+                  <span class="t-label">注目:</span>
+                  三脚スキャナ・ドローン・歩き測りの3種を自動でまとめるクラウドサービスが登場。
+                </p>
+              </div>
+            </details>
+          </article>
+          <div class="pipe-arrow reveal">↓</div>
+
+          <!-- pre_clean -->
+          <article class="node reveal">
+            <p class="nlabel">通行人や反射などの"ゴミ"を取り除く</p>
+            <p class="desc">
+              測定中に映り込んだ通行人・光の反射などの余分な点を取り除く（SOR
+              などの手法）。
+            </p>
+            <div class="meta">
+              <div class="row">
+                <span class="k">ツール</span
+                ><span class="v">CloudCompare, ReCap</span>
+              </div>
+              <div class="row">
+                <span class="k">形式</span><span class="v">E57 / LAS</span>
+              </div>
+            </div>
+            <div class="link">
+              <a
+                href="https://www.thefuture3d.com/blog-0/2026/3/3/point-cloud-processing/"
+                target="_blank"
+                rel="noopener"
+                >事例 →</a
+              >
+            </div>
+
+            <details class="trend">
+              <summary>最新動向 2025-26</summary>
+              <div class="trend-body">
+                <p>
+                  古典的な手法（SOR
+                  など）からAIフィルタへ移行が進んでいる。建築分野では依然として
+                  CloudCompare＋手動調整が多い。AIを使った検出は複雑な屋内環境で特に効果が高い。
+                </p>
+                <p>
+                  <span class="t-label">注目:</span>
+                  コンピュータで作った仮想点群でAIを学習させ、現場データが少ない問題を克服するアプローチが定着してきた。
+                </p>
+              </div>
+            </details>
+          </article>
+          <div class="pipe-arrow reveal">↓</div>
+
+          <!-- pre_geo -->
+          <article class="node reveal">
+            <p class="nlabel">測ったデータを地図上の正しい位置に固定する</p>
+            <p class="desc">
+              地上に置いた基準点（GCP）や
+              GPS（GNSS）を使って、3Dデータを現実の地図座標に合わせる。
+            </p>
+            <div class="meta">
+              <div class="row">
+                <span class="k">ツール</span
+                ><span class="v">CloudCompare, ReCap, QGIS</span>
+              </div>
+              <div class="row">
+                <span class="k">形式</span><span class="v">LAS / LAZ</span>
+              </div>
+            </div>
+            <div class="link">
+              <a
+                href="https://poly.cam/blog/how-to-georeference-polycam-scans-with-ground-control-points-in-cloudcompare-polycam"
+                target="_blank"
+                rel="noopener"
+                >事例 →</a
+              >
+            </div>
+
+            <details class="trend">
+              <summary>最新動向 2025-26</summary>
+              <div class="trend-body">
+                <p>
+                  地上基準点なしで高精度測位できる RTK-UAV＋PPK
+                  の精度が上がり、座標固定がほぼ自動化された。建物の3D設計図（BIM）との連携は
+                  IFC 4.3 で座標の標準化が前進（2025年）。
+                </p>
+                <p>
+                  <span class="t-label">注目:</span>
+                  GPS（GNSS）と加速度センサー（IMU）の統合で、建物の内外をシームレスに座標固定することが実現した。
+                </p>
+              </div>
+            </details>
+          </article>
+          <div class="pipe-arrow reveal">
+            ↓ <span class="tag">ここが一番の山場</span>
+          </div>
+
+          <!-- pre_decim ★ HERO -->
+          <section class="decim-hero reveal" id="decim">
+            <div class="top">
+              <span class="badge-star">★ 研究の本丸</span>
+              <h3>データを軽くする（点の数を減らす）</h3>
+            </div>
+            <p class="desc">
+              点の数を間引いて、でも形はちゃんと保つ。軽さと精度の両立が問われる用途の手前で効く要所＝研究の本丸。
+              <b style="color: var(--orange)">ESR（部材が残っている割合）</b
+              >という指標で「間引いても大事な情報がどれだけ残るか」を測る。<b
+                >現時点ではESRで統計的に有意な改善を確認済み（MCR・BPRなど他指標は次フェーズで検証予定）。</b
+              >
+              下のアニメは、点を間引いても<span
+                style="color: var(--orange); font-weight: 700"
+                >オレンジの柱・梁ライン</span
+              >だけ密度を保つイメージ。
+            </p>
+            <p
+              class="desc"
+              style="font-size: 12px; color: var(--text-sub); margin-top: -8px"
+            >
+              ※
+              ESRは間引き手法（CSCスコア）と記述子を一部共有するため、独立性を高める別指標との比較を次フェーズで予定。
+            </p>
+
+            <div class="canvas-shell">
+              <canvas
+                id="decimCanvas"
+                width="600"
+                height="400"
+                aria-label="点の数が減っても柱・梁のラインだけ残るアニメーション"
+              ></canvas>
+              <div class="canvas-meta">
+                <div class="esr-wrap">
+                  <div class="esr-label">
+                    <span>ESR 柱・梁の残存割合（オレンジ）</span
+                    ><span
+                      class="esr-val"
+                      id="esrMember"
+                      style="color: var(--orange)"
+                      >100%</span
+                    >
+                  </div>
+                  <div class="bar member">
+                    <span id="barMember" style="width: 100%"></span>
+                  </div>
+                </div>
+                <div class="esr-wrap">
+                  <div class="esr-label">
+                    <span>全体の点の数（間引き後）</span
+                    ><span
+                      class="esr-val"
+                      id="esrOverall"
+                      style="color: var(--teal)"
+                      >100%</span
+                    >
+                  </div>
+                  <div class="bar overall">
+                    <span id="barOverall" style="width: 100%"></span>
+                  </div>
+                </div>
+                <div class="stat-row">
+                  <span>残っている点の数</span><b id="ptCount">—</b>
+                </div>
+                <div class="stat-row">
+                  <span>どれだけ軽くなったか</span><b id="compRatio">1.0 : 1</b>
+                </div>
+                <button class="replay" id="replayBtn" type="button">
+                  ▶ もう一度間引く
+                </button>
+              </div>
+              <p class="canvas-cap">
+                teal＝表面の点（間引かれて減る）／ orange＝柱・梁（密度を保つ）
+              </p>
+            </div>
+
+            <div class="decim-meta">
+              <div class="row">
+                <span class="k">ツール</span
+                ><span>CloudCompare, ReCap, LAStools</span>
+              </div>
+              <div class="row">
+                <span class="k">形式</span
+                ><span
+                  >LAZ 形式（ファイル圧縮）／
+                  本研究の間引きは約70%削減（3.3:1）が中心条件</span
+                >
+              </div>
+              <div class="row">
+                <span class="k">事例</span
+                ><span
+                  ><a
+                    href="https://forums.autodesk.com/t5/recap-forum/decreasing-point-cloud-density/td-p/7764218"
+                    target="_blank"
+                    rel="noopener"
+                    >Autodesk ReCap 点密度の調整 →</a
+                  ></span
+                >
+              </div>
+            </div>
+
+            <details class="trend">
+              <summary>
+                ★ 最新動向 2025-26 — 軽量化の最前線（研究の本丸）
+              </summary>
+              <div class="trend-body">
+                <p>
+                  2025年に「部材の種類ごとに間引き方を変える手法（semantics-aware
+                  decimation）」が複数のグループから独立に登場。角やエッジなど大事な部分の保存率が大幅に上がった＝岩根研究の「部材を落とさない軽量化」と直接対応する動き。
+                </p>
+                <p>
+                  <span class="t-label">注目:</span>
+                  どれだけ均一に間引くか・特徴的な部分を優先するかを連続的に調整できる仕組み（LOD制御）や、AIで点ごとの「大事さスコア」を計算する手法も登場。
+                </p>
+                <p>
+                  役割の変化: データ容量を減らすための後処理 →
+                  意味のある部分を選んで残す前工程へ。
+                </p>
+                <p>
+                  <a
+                    href="https://www.tandfonline.com/doi/full/10.1080/17538947.2025.2505993"
+                    target="_blank"
+                    rel="noopener"
+                    >意味を保つ軽量化（Semantics-aware decimation）→</a
+                  >
+                  &nbsp;/&nbsp;
+                  <a
+                    href="https://www.mdpi.com/2220-9964/14/7/279"
+                    target="_blank"
+                    rel="noopener"
+                    >LOD制御研究 →</a
+                  >
+                </p>
+              </div>
+            </details>
+          </section>
+
+          <div class="pipe-arrow reveal">↓</div>
+
+          <!-- pre_seg -->
+          <article class="node reveal">
+            <p class="nlabel">部品ごとに仕分ける（セグメンテーション）</p>
+            <p class="desc">
+              壁・床・柱などどの部分かを3Dデータに書き込む（＝仕分け）。建物の3D設計図を自動で作る土台になる。
+            </p>
+            <div class="meta">
+              <div class="row">
+                <span class="k">ツール</span
+                ><span class="v">CloudCompare, AIによる部品仕分け</span>
+              </div>
+              <div class="row">
+                <span class="k">形式</span><span class="v">E57 / LAS</span>
+              </div>
+            </div>
+            <div class="link">
+              <a
+                href="https://www.mdpi.com/2072-4292/15/3/548"
+                target="_blank"
+                rel="noopener"
+                >事例 →</a
+              >
+            </div>
+
+            <details class="trend">
+              <summary>★ 最新動向 2025-26 — 岩根研究と直結する領域</summary>
+              <div class="trend-body">
+                <p>
+                  正解のお手本なしにAIが自分で学ぶ方式（ラベルレス基盤モデル）が急成長中（今一番動きが速い領域）。Sonata（CVPR'25
+                  Highlight）、Concerto（NeurIPS'25、2D・3D同時学習）、Utonia（ICML'26投稿中・未査読、屋内外・CADを単一モデルで統合）、Point-SAM（ICLR'25、3D空間版の万能切り抜きモデル）が相次いで登場。
+                </p>
+                <p>
+                  <span class="t-label">注目:</span>
+                  決まったクラスを人が教える方式から、テキスト指示だけで任意の部品を切り出せる汎用モデルへ移行。本研究の「お手本なし（label-free）で点の重要度を測る」考え方と地続きの領域（※軽量化＝重要度に応じた間引き／セグメンテーション＝部品の仕分け、は別処理として整理）。
+                </p>
+                <p>
+                  <a
+                    href="https://xywu.me/sonata/"
+                    target="_blank"
+                    rel="noopener"
+                    >Sonata (CVPR'25) →</a
+                  >
+                  &nbsp;/&nbsp;
+                  <a
+                    href="https://arxiv.org/html/2603.03283v1"
+                    target="_blank"
+                    rel="noopener"
+                    >Concerto (NeurIPS'25) →</a
+                  >
+                </p>
+              </div>
+            </details>
+          </article>
+        </div>
+
+        <p class="merge-note reveal">
+          下ごしらえを終えると、用途ごとに経路が分かれる<span class="down"
+            >↓</span
+          >
+        </p>
+      </div>
+    </section>
+
+    <!-- ===================== ③ 活用 ===================== -->
+    <section class="stage">
+      <div class="wrap">
+        <div class="stage-head reveal">
+          <span class="stage-num">STAGE 03</span>
+          <h2>活用 — 何に使われるか</h2>
+        </div>
+        <p class="sub reveal">
+          整えた点群がたどり着く出口の一覧。★がついたノードは、軽量化の質と「大事な部分がどれだけ残っているか（ESR）」がそのまま出来栄えを左右する＝本研究が一番力を発揮できる場所。
+        </p>
+
+        <!-- 分岐A: 軽量化ハブから直接 -->
+        <div class="out-group reveal">
+          <p class="branch-label">
+            データを軽くした後に直接つながる出口 → ブラウザ表示 / 3D復元 /
+            ひび割れ検知 / 立体化
+          </p>
+          <div class="grid-out">
+            <!-- out_web ★ -->
+            <article class="node star reveal">
+              <p class="nlabel">
+                <span class="badge-star">★</span>
+                ブラウザで巨大点群を見せる（Potree / 3D Tiles）
+              </p>
+              <p class="desc">
+                ウェブブラウザで大量の3Dデータを閲覧できる。近くは細かく遠くは粗く必要な分だけ表示する仕組み（LODストリーミング）の質は、軽量化の出来栄えがそのまま使い心地に直結する＝配信できるかどうかを軽量化とESRが決める。
+              </p>
+              <div class="meta">
+                <div class="row">
+                  <span class="k">経路</span
+                  ><span class="v">軽量化 → 必要な分だけ表示</span>
+                </div>
+                <div class="row">
+                  <span class="k">ツール</span
+                  ><span class="v">Potree, Cesium ion</span>
+                </div>
+                <div class="row">
+                  <span class="k">形式</span
+                  ><span class="v">LAS → 3D Tiles</span>
+                </div>
+              </div>
+              <div class="link">
+                <a
+                  href="https://cesium.com/blog/2026/04/27/3d-gaussian-splats-lod/"
+                  target="_blank"
+                  rel="noopener"
+                  >事例 →</a
+                >
+              </div>
+
+              <details class="trend">
+                <summary>最新動向 2025-26</summary>
+                <div class="trend-body">
+                  <p>
+                    Potree は依然主力のオープンソースツールだが、3D
+                    Tiles（国際標準）が写真から作る3D空間・点群・設計図（BIM）をまとめて配信するフォーマットとして台頭。Cesium
+                    が3D Tiles を拡張して対応した。
+                  </p>
+                  <p>
+                    <span class="t-label">注目:</span>
+                    点群だけを配信する仕組み →
+                    点群・リアル3D空間・設計図・センサーをまとめて扱う空間APIの一部へ。
+                  </p>
+                  <p>
+                    <a
+                      href="https://www.thefuture3d.com/software/cesium/"
+                      target="_blank"
+                      rel="noopener"
+                      >Cesium 3D Tiles →</a
+                    >
+                  </p>
+                </div>
+              </details>
+            </article>
+            <!-- out_gs -->
+            <article class="node reveal">
+              <p class="nlabel">
+                写真から本物そっくりの3D空間を作る（Gaussian Splatting / NeRF）
+              </p>
+              <p class="desc">
+                写真から本物そっくりの3D空間を作る新技術。点群より軽くブラウザでリアルタイムに表示できる。
+              </p>
+              <div class="meta">
+                <div class="row">
+                  <span class="k">ツール</span
+                  ><span class="v">3DGS, NeRF, Cesium iTwin</span>
+                </div>
+                <div class="row">
+                  <span class="k">形式</span
+                  ><span class="v">PLY → SPZ / glTF</span>
+                </div>
+              </div>
+              <div class="link">
+                <a
+                  href="https://cesium.com/blog/2026/04/27/3d-gaussian-splats-lod/"
+                  target="_blank"
+                  rel="noopener"
+                  >事例 →</a
+                >
+              </div>
+
+              <details class="trend">
+                <summary>最新動向 2025-26</summary>
+                <div class="trend-body">
+                  <p>
+                    3DGS（Gaussian
+                    Splatting）が2025年に研究段階から実用ツールへ移行完了（NeRFより10倍高速・100FPS以上）。DJI
+                    Terra
+                    V5.0が点群とGSを同時生成。言語情報を組み込んだ3DGSで歴史建造物のデジタル化（精度84.15%
+                    mIoU）も実現。
+                  </p>
+                  <p>
+                    <span class="t-label">注目:</span>
+                    点群はGSの初期段階で「大まかな骨格」として使われ、外観の見た目の再現ではGSが点群を上回るケースが増えた＝それぞれの役割が再定義されつつある。
+                  </p>
+                  <p>
+                    <a
+                      href="https://isprs-annals.copernicus.org/articles/X-M-2-2025/215/2025/"
+                      target="_blank"
+                      rel="noopener"
+                      >GS4Buildings (2025) →</a
+                    >
+                  </p>
+                </div>
+              </details>
+            </article>
+            <!-- out_crack ★ -->
+            <article class="node star reveal">
+              <p class="nlabel">
+                <span class="badge-star">★</span>
+                ひび割れ・変形を見つける・継続監視
+              </p>
+              <p class="desc">
+                2時点の点群を重ねて差分を取ることで、触れずに表面のひび割れや経年変形を検出する。文化財では「mm単位のひびを残しつつデータを軽くする」という相反する要求を同時にこなす必要がある＝本研究が一番力を発揮できる場所。
+              </p>
+              <div class="meta">
+                <div class="row">
+                  <span class="k">ツール</span
+                  ><span class="v">CloudCompare (C2C / M3C2)</span>
+                </div>
+                <div class="row">
+                  <span class="k">形式</span><span class="v">E57 / LAS</span>
+                </div>
+              </div>
+              <div class="link">
+                <a
+                  href="https://www.sciencedirect.com/science/article/abs/pii/S2352710223016200"
+                  target="_blank"
+                  rel="noopener"
+                  >事例 →</a
+                >
+              </div>
+
+              <details class="trend">
+                <summary>最新動向 2025-26</summary>
+                <div class="trend-body">
+                  <p>
+                    3D点群を使ったひび割れ検出がAIで自動化。色の情報がなく形状だけでも検出できる（2025年）。南京・中華門（明代の城壁）のひび割れ解析が実例として報告されている。
+                  </p>
+                  <p>
+                    <span class="t-label">注目:</span> Picca —
+                    微細な形の変化を「動き」の問題として捉える新しいアプローチ。外観を記録するだけ
+                    → 劣化の度合いを数値で測る装置へ昇格。
+                  </p>
+                  <p>
+                    <a
+                      href="https://www.mdpi.com/2075-5309/14/8/2278"
+                      target="_blank"
+                      rel="noopener"
+                      >点群クラック検出 2025 →</a
+                    >
+                  </p>
+                </div>
+              </details>
+            </article>
+            <!-- out_mesh -->
+            <article class="node reveal">
+              <p class="nlabel">
+                点を面でつないで立体にする（メッシュ化）→ ゲームエンジン /
+                シミュレーション
+              </p>
+              <p class="desc">
+                点の集まりを面でつないで立体（メッシュ）にする → Unreal Engine /
+                Unity でシミュレーションや環境解析に使う。
+              </p>
+              <div class="meta">
+                <div class="row">
+                  <span class="k">ツール</span
+                  ><span class="v">MeshLab, Blender, Unreal</span>
+                </div>
+                <div class="row">
+                  <span class="k">形式</span
+                  ><span class="v">PLY / OBJ → glTF</span>
+                </div>
+              </div>
+              <div class="link">
+                <a
+                  href="https://radiancefields.com/understanding-3d-gaussian-splatting-via-render-engines"
+                  target="_blank"
+                  rel="noopener"
+                  >事例 →</a
+                >
+              </div>
+
+              <details class="trend">
+                <summary>最新動向 2025-26</summary>
+                <div class="trend-body">
+                  <p>
+                    CloudCompare → Poisson法でメッシュ化 → FBX/OBJ →
+                    Unreal/Unity が定番だが、3DGS が「メッシュを作らずそのまま
+                    Unreal
+                    に読み込む」ルートを開拓した。衝突判定やオブジェクト操作が必要な場面ではメッシュ変換が依然必須。
+                  </p>
+                  <p>
+                    <span class="t-label">注目:</span> UE5 Nanite・3D Tiles →
+                    Cesium for Unreal
+                    で大規模点群とメッシュを一緒に描画することが実用化。かつては唯一の3D化経路だったが、今はインタラクティブ用途に特化したルートへと役割が絞られた。
+                  </p>
+                  <p>
+                    <a
+                      href="https://www.preprints.org/manuscript/202504.1068/v1"
+                      target="_blank"
+                      rel="noopener"
+                      >点群→Unreal workflow 2025 →</a
+                    >
+                  </p>
+                </div>
+              </details>
+            </article>
+          </div>
+        </div>
+
+        <!-- 分岐B: 分類から -->
+        <div class="out-group reveal">
+          <p class="branch-label">
+            部品仕分け後の出口 → 自動で3D設計図を作る / 文化財デジタル化
+          </p>
+          <div class="grid-out">
+            <!-- out_bim -->
+            <article class="node reveal">
+              <p class="nlabel">
+                測ったデータから建物の3D設計図を作る（Scan-to-BIM / HBIM）
+              </p>
+              <p class="desc">
+                実際に建ったままの形をBIM（建物の3D設計図）に変換する。既存建物のBIM化で最も使われる用途で、文化財向けはHBIMと呼ぶ。<span
+                  class="edge-pill"
+                  >部品仕分け → 自動モデル化</span
+                >
+              </p>
+              <div class="meta">
+                <div class="row">
+                  <span class="k">ツール</span
+                  ><span class="v">ReCap → Revit, Navisworks</span>
+                </div>
+                <div class="row">
+                  <span class="k">形式</span><span class="v">RCP → IFC</span>
+                </div>
+              </div>
+              <div class="link">
+                <a
+                  href="https://www.altitudesmagazine.com/scan-bim-trends-reshaping-construction-projects-2026/"
+                  target="_blank"
+                  rel="noopener"
+                  >事例 →</a
+                >
+              </div>
+
+              <details class="trend">
+                <summary>最新動向 2025-26</summary>
+                <div class="trend-body">
+                  <p>
+                    AIが点群を部品ごとに自動で仕分け →
+                    設計図のオブジェクトを自動生成するところまで前進。人の役割はレビューと修正判断へシフト。EdgeWise
+                    / NavLive / Autodesk Forma が代表例。
+                  </p>
+                  <p>
+                    <span class="t-label">注目:</span>
+                    3D設計図を作るための素材 →
+                    AIが直接解釈する入力へ。手作業でなぞる工程が消滅しつつある。
+                  </p>
+                  <p>
+                    <a
+                      href="https://www.fingerlakes1.com/2026/03/20/scan-to-bim-in-2026-trends-shaping-the-future-of-construction/"
+                      target="_blank"
+                      rel="noopener"
+                      >Scan-to-BIM 2026 トレンド →</a
+                    >
+                  </p>
+                </div>
+              </details>
+            </article>
+            <!-- out_heritage -->
+            <article class="node reveal">
+              <p class="nlabel">文化財をデジタルで記録・保存・展示する</p>
+              <p class="desc">
+                二度と元に戻せない遺構をmm単位で記録・復元・展示する。レーザー・写真など複数の手段で取ったデータを組み合わせて使う。
+              </p>
+              <div class="meta">
+                <div class="row">
+                  <span class="k">ツール</span
+                  ><span class="v"
+                    >HBIM（文化財向けBIM）、スキャン＋写真の組み合わせ</span
+                  >
+                </div>
+                <div class="row">
+                  <span class="k">形式</span><span class="v">E57 / IFC</span>
+                </div>
+              </div>
+              <div class="link">
+                <a
+                  href="https://www.mdpi.com/2076-3417/15/16/8929"
+                  target="_blank"
+                  rel="noopener"
+                  >事例 →</a
+                >
+              </div>
+
+              <details class="trend">
+                <summary>最新動向 2025-26</summary>
+                <div class="trend-body">
+                  <p>
+                    点群（＝測定値の正本）と写真から作る3D空間（GS＝見た目の表層）を分けて使う「二層構造」が
+                    CIPA 2025 で標準として浮上。HBIM
+                    と複数手段融合による10年分の変化の定量評価も報告（MDPI
+                    2025）。
+                  </p>
+                  <p>
+                    <span class="t-label">注目:</span>
+                    アーカイブの本体（正確な測定値）→
+                    真値の基盤として。GSが「見せる・体験させる」表層を担う二層構造へ。
+                  </p>
+                  <p>
+                    <a
+                      href="https://www.nature.com/articles/s40494-025-02063-5"
+                      target="_blank"
+                      rel="noopener"
+                      >Heritage GS+点群 二層構造 →</a
+                    >
+                  </p>
+                </div>
+              </details>
+            </article>
+          </div>
+        </div>
+
+        <!-- 分岐C: BIM二次分岐 -->
+        <div class="out-group reveal">
+          <p class="branch-label">
+            3D設計図（BIM）からさらに広がる出口 → デジタルの分身 /
+            建物の強度計算 / 施工検査
+          </p>
+          <div class="grid-out">
+            <!-- out_dt -->
+            <article class="node reveal">
+              <p class="nlabel">
+                現実の建物そっくりのデジタルの分身（デジタルツイン）/ 施設管理
+              </p>
+              <p class="desc">
+                進捗管理・維持管理・故障の予兆検知など。問題が起きてから対処する方式から、AIが事前に予測して備える方式へ。<span
+                  class="edge-pill"
+                  >3D設計図 → IoTセンサー連携</span
+                >
+              </p>
+              <div class="meta">
+                <div class="row">
+                  <span class="k">ツール</span
+                  ><span class="v">Revit + IoT</span>
+                </div>
+                <div class="row">
+                  <span class="k">形式</span><span class="v">IFC</span>
+                </div>
+              </div>
+              <div class="link">
+                <a
+                  href="https://arxiv.org/pdf/2512.12149"
+                  target="_blank"
+                  rel="noopener"
+                  >事例 →</a
+                >
+              </div>
+
+              <details class="trend">
+                <summary>最新動向 2025-26</summary>
+                <div class="trend-body">
+                  <p>
+                    点群＋温度・在室・エネルギーなどのIoTセンサーを組み合わせた「生きているデジタルツイン」が2025〜26年の主流。AIによる予測メンテナンス。BIM2RDT（3D設計図
+                    → ロボットが作業できる現場デジタルツイン、2025/09）も登場。
+                  </p>
+                  <p>
+                    <span class="t-label">注目:</span> Matterport / Bentley
+                    iTwin / Azure Digital Twins が代表例。建物の形を記録するだけ
+                    → リアルタイムのセンサーと紐づける空間フレームへ。
+                  </p>
+                  <p>
+                    <a
+                      href="https://www.rtinsights.com/digital-twins-in-2026-from-digital-replicas-to-intelligent-ai-driven-systems/"
+                      target="_blank"
+                      rel="noopener"
+                      >Digital Twins 2026 →</a
+                    >
+                  </p>
+                </div>
+              </details>
+            </article>
+            <!-- out_struct -->
+            <article class="node reveal">
+              <p class="nlabel">
+                建物がどれだけ力に耐えるかを計算する（構造解析 / FEM連携）
+              </p>
+              <p class="desc">
+                文化財BIM（HBIM）→ 形状モデル →
+                コンピュータによる応力・変形シミュレーション（FEM）。建物の強さを数値で推定する。
+              </p>
+              <div class="meta">
+                <div class="row">
+                  <span class="k">ツール</span
+                  ><span class="v"
+                    >文化財BIM（HBIM）→ 構造シミュレーション（FEM）</span
+                  >
+                </div>
+                <div class="row">
+                  <span class="k">形式</span><span class="v">IFC</span>
+                </div>
+              </div>
+              <div class="link">
+                <a
+                  href="https://dl.acm.org/doi/10.1145/3242901"
+                  target="_blank"
+                  rel="noopener"
+                  >事例 →</a
+                >
+              </div>
+
+              <details class="trend">
+                <summary>最新動向 2025-26</summary>
+                <div class="trend-body">
+                  <p>
+                    スキャンから構造シミュレーション（FEM）への自動変換が2024〜25年に実用レベルへ成熟（点群
+                    → 部品グループ化 → 主成分分析 → エッジ検出 →
+                    シェルメッシュ自動生成）。被災後評価の「実際に建ったままのFEM」でも活躍。
+                  </p>
+                  <p>
+                    <span class="t-label">注目:</span>
+                    測定データを記録するだけ →
+                    計算モデルの入力に直接つなぐ経路が確立。測量から解析までのループが大幅に短縮された。
+                  </p>
+                  <p>
+                    <a
+                      href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC12252352/"
+                      target="_blank"
+                      rel="noopener"
+                      >Scan-to-FEM 2025 →</a
+                    >
+                  </p>
+                </div>
+              </details>
+            </article>
+            <!-- out_inspect -->
+            <article class="node reveal">
+              <p class="nlabel">
+                設計どおりに作れているかをチェックする（施工検査）
+              </p>
+              <p class="desc">
+                設計上の3D図と実際に測った点群を重ねて差分を計算し、施工のずれを自動で検査する。
+              </p>
+              <div class="meta">
+                <div class="row">
+                  <span class="k">ツール</span
+                  ><span class="v">Navisworks, CloudCompare</span>
+                </div>
+                <div class="row">
+                  <span class="k">形式</span><span class="v">RCP / E57</span>
+                </div>
+              </div>
+              <div class="link">
+                <a
+                  href="https://www.hitechcaddservices.com/news/point-cloud-to-revit-backbone-of-scan-to-bim-projects/"
+                  target="_blank"
+                  rel="noopener"
+                  >事例 →</a
+                >
+              </div>
+
+              <details class="trend">
+                <summary>最新動向 2025-26</summary>
+                <div class="trend-body">
+                  <p>
+                    点群と3D設計図のずれレポートを自動生成する商用SaaSが2025年に登場。AIを使って寸法・面の品質・水平度・垂直度の4指標を自動検査（上海グランドオペラハウスで実証済み）。
+                  </p>
+                  <p>
+                    <span class="t-label">注目:</span>
+                    コンピュータで作った仮想点群でAIを学習させ、現場データが少ない問題を克服。目視確認の補助
+                    → AIが建築基準への適合を自動判定する品質指標の入力へ進化。
+                  </p>
+                  <p>
+                    <a
+                      href="https://onlinelibrary.wiley.com/doi/10.1155/stc/9918445"
+                      target="_blank"
+                      rel="noopener"
+                      >自動検査 2025 →</a
+                    >
+                  </p>
+                </div>
+              </details>
+            </article>
+          </div>
+        </div>
+
+        <!-- 分岐D: 可視化連鎖 -->
+        <div class="out-group reveal">
+          <p class="branch-label">
+            3D表示から → VR/AR体験へ（GS・メッシュ・ブラウザ表示を経由）
+          </p>
+          <div class="grid-out">
+            <!-- out_vr -->
+            <article class="node reveal">
+              <p class="nlabel">
+                ゴーグル・スマホで現実に3Dを重ねて体験する（VR / AR）
+              </p>
+              <p class="desc">
+                没入感のある可視化・施主への説明・遠隔での現場確認。<span
+                  class="edge-pill"
+                  >3D空間（SPZ 90%圧縮）/ メッシュ / ブラウザ表示 → VR</span
+                >
+              </p>
+              <div class="meta">
+                <div class="row">
+                  <span class="k">ツール</span
+                  ><span class="v">Unreal + Cesium, Unity</span>
+                </div>
+                <div class="row">
+                  <span class="k">形式</span><span class="v">glTF / SPZ</span>
+                </div>
+              </div>
+              <div class="link">
+                <a
+                  href="https://gameenginehub.com/insights/spark-2-0-a-web-native-3d-world-runtime-built-on-gaussian-splatting"
+                  target="_blank"
+                  rel="noopener"
+                  >事例 →</a
+                >
+              </div>
+
+              <details class="trend">
+                <summary>最新動向 2025-26</summary>
+                <div class="trend-body">
+                  <p>
+                    AR（拡張現実）＝深度情報で点群と3D設計図を重ね合わせ、現場でBIMを目の前に表示する施工検査が活発化。VR（仮想現実）＝Unreal
+                    Engine＋GSでリアルな遺産VR（Gatekeeper's
+                    Cottage）が実現。Apple Vision
+                    Pro×点群の空間UIが試験導入された。
+                  </p>
+                  <p>
+                    <span class="t-label">注目:</span>
+                    建物の形状データが背景ジオメトリとしてだけでなく、ARの「空間アンカー（現実に3Dを貼り付ける基点）」として活用される方向へ。
+                  </p>
+                  <p>
+                    <a
+                      href="https://www.frontiersin.org/journals/computer-science/articles/10.3389/fcomp.2025.1515609/full"
+                      target="_blank"
+                      rel="noopener"
+                      >Heritage VR 2025 →</a
+                    >
+                  </p>
+                </div>
+              </details>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="wrap">
+        建築・文化財の点群データを「大事な部分を残したままお手本なしで軽くする」研究
+        × ESR（残存割合）評価 —
+        <b>測定 → 下ごしらえ（軽量化が山場）→ 活用</b> の経路マップ。<br />
+        本研究は<b style="color: var(--orange)"
+          >データを軽くするハブ（軽量化）</b
+        >と★ノード（ブラウザ配信 / ひび割れ検知）で最も効く。
+      </div>
+    </footer>
+
+    <script>
+      // ===== Progress bar =====
+      const progress = document.getElementById("progress");
+      function updateProgress() {
+        const h = document.documentElement;
+        const scrolled = h.scrollTop / (h.scrollHeight - h.clientHeight);
+        progress.style.width = Math.min(100, Math.max(0, scrolled * 100)) + "%";
+      }
+      window.addEventListener("scroll", updateProgress, { passive: true });
+      updateProgress();
+
+      // ===== Reveal on scroll (IntersectionObserver) =====
+      const io = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((e, i) => {
+            if (e.isIntersecting) {
+              e.target.classList.add("in");
+              io.unobserve(e.target);
+            }
+          });
+        },
+        { threshold: 0.12, rootMargin: "0px 0px -8% 0px" },
+      );
+      document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
+
+      // ===== Decimation mini-animation =====
+      (function () {
+        const canvas = document.getElementById("decimCanvas");
+        const ctx = canvas.getContext("2d");
+        const W = canvas.width,
+          H = canvas.height;
+
+        // Build a synthetic "building" point set:
+        //  - background cloud (teal, generic surface points) -> heavily decimated
+        //  - member lines (orange, structural members: posts/beams) -> kept dense
+        const bg = []; // {x,y}
+        const member = []; // {x,y}
+
+        // generic surface points (wall texture-ish noise)
+        for (let i = 0; i < 1400; i++) {
+          bg.push({ x: Math.random() * W, y: Math.random() * H });
+        }
+        // structural members: a simple frame (two posts + two beams + a diagonal)
+        function addLine(x1, y1, x2, y2, n) {
+          for (let i = 0; i < n; i++) {
+            const t = i / (n - 1);
+            const jx = (Math.random() - 0.5) * 6;
+            const jy = (Math.random() - 0.5) * 6;
+            member.push({
+              x: x1 + (x2 - x1) * t + jx,
+              y: y1 + (y2 - y1) * t + jy,
+            });
+          }
+        }
+        const m = 0.12; // margin factor
+        addLine(W * 0.22, H * 0.12, W * 0.22, H * 0.9, 180); // left post
+        addLine(W * 0.78, H * 0.12, W * 0.78, H * 0.9, 180); // right post
+        addLine(W * 0.22, H * 0.12, W * 0.78, H * 0.12, 150); // top beam
+        addLine(W * 0.22, H * 0.55, W * 0.78, H * 0.55, 150); // mid beam
+        addLine(W * 0.22, H * 0.9, W * 0.78, H * 0.55, 130); // diagonal brace
+
+        const bgTotal = bg.length;
+        const memberTotal = member.length;
+
+        const esrMemberEl = document.getElementById("esrMember");
+        const esrOverallEl = document.getElementById("esrOverall");
+        const barMemberEl = document.getElementById("barMember");
+        const barOverallEl = document.getElementById("barOverall");
+        const ptCountEl = document.getElementById("ptCount");
+        const compRatioEl = document.getElementById("compRatio");
+        const replayBtn = document.getElementById("replayBtn");
+
+        let raf = null;
+        let startTime = null;
+        const DURATION = 3200; // ms
+        const reduceMotion = window.matchMedia(
+          "(prefers-reduced-motion: reduce)",
+        ).matches;
+
+        function draw(bgKeep, memberKeep) {
+          ctx.clearRect(0, 0, W, H);
+          // subtle grid background
+          ctx.fillStyle = "#0b1220";
+          ctx.fillRect(0, 0, W, H);
+
+          // generic points (teal), keep ratio shrinks aggressively
+          ctx.fillStyle = "rgba(45, 212, 191, 0.75)";
+          const bgN = Math.floor(bgTotal * bgKeep);
+          for (let i = 0; i < bgN; i++) {
+            const p = bg[i];
+            ctx.fillRect(p.x, p.y, 2, 2);
+          }
+
+          // member points (orange), keep ratio stays high
+          ctx.fillStyle = "rgba(249, 115, 22, 0.95)";
+          const mN = Math.floor(memberTotal * memberKeep);
+          for (let i = 0; i < mN; i++) {
+            const p = member[i];
+            ctx.fillRect(p.x, p.y, 2.4, 2.4);
+          }
+          return { bgN, mN };
+        }
+
+        function easeInOut(t) {
+          return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        }
+
+        // render one eased-progress step (draw + stats); used by both the
+        // animation loop and the static reduced-motion final frame.
+        function render(t) {
+          // background decays from 1.0 -> 0.12 (heavy decimation)
+          const bgKeep = 1 - t * (1 - 0.12);
+          // member stays nearly full: 1.0 -> 0.94 (ESR high)
+          const memberKeep = 1 - t * (1 - 0.94);
+
+          const { bgN, mN } = draw(bgKeep, memberKeep);
+
+          const memberPct = Math.round(memberKeep * 100);
+          const overallKept = bgN + mN;
+          const overallPct = Math.round(
+            (overallKept / (bgTotal + memberTotal)) * 100,
+          );
+
+          esrMemberEl.textContent = memberPct + "%";
+          esrOverallEl.textContent = overallPct + "%";
+          barMemberEl.style.width = memberPct + "%";
+          barOverallEl.style.width = overallPct + "%";
+          ptCountEl.textContent = overallKept.toLocaleString() + " pts";
+          const ratio = (bgTotal + memberTotal) / Math.max(1, overallKept);
+          compRatioEl.textContent = ratio.toFixed(1) + " : 1";
+        }
+
+        function frame(ts) {
+          if (!startTime) startTime = ts;
+          const raw = Math.min(1, (ts - startTime) / DURATION);
+          render(easeInOut(raw));
+          if (raw < 1) {
+            raf = requestAnimationFrame(frame);
+          }
+        }
+
+        function play() {
+          // reduced-motion: jump straight to the decimated final frame
+          if (reduceMotion) {
+            if (raf) cancelAnimationFrame(raf);
+            render(1);
+            return;
+          }
+          if (raf) cancelAnimationFrame(raf);
+          startTime = null;
+          raf = requestAnimationFrame(frame);
+        }
+
+        // draw initial full state
+        draw(1, 1);
+        ptCountEl.textContent =
+          (bgTotal + memberTotal).toLocaleString() + " pts";
+
+        // fire when the decim section scrolls into view (once), via its own observer
+        let played = false;
+        const decimIO = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((e) => {
+              if (e.isIntersecting && !played) {
+                played = true;
+                play();
+              }
+            });
+          },
+          { threshold: 0.45 },
+        );
+        decimIO.observe(canvas);
+
+        replayBtn.addEventListener("click", play);
+      })();
+    </script>
+  </body>
+</html>

@@ -1958,6 +1958,8 @@
         const H = randomCanvas.height;
         const FINAL_KEEP = 0.3;
         const GUIDED_MEMBER_KEEP = 0.6;
+        const INITIAL_MEMBER_ALPHA = 0.74;
+        const INITIAL_SURFACE_ALPHA = 0.62;
         const DURATION = 3600;
         const reduceMotion = window.matchMedia(
           "(prefers-reduced-motion: reduce)",
@@ -2164,6 +2166,7 @@
         function drawPanel(panel, keepRatio, t) {
           const ctx = panel.ctx;
           drawReference(ctx);
+          const methodReveal = Math.max(0, Math.min(1, (t - 0.08) / 0.92));
 
           const kept = [];
           let memberKept = 0;
@@ -2174,9 +2177,8 @@
             if (point.kind === "member") memberKept += 1;
           }
 
-          if (panel.mode === "guided") {
-            const glow = Math.min(1, t * 2.4);
-            ctx.fillStyle = `rgba(249, 115, 22, ${0.08 + glow * 0.12})`;
+          if (panel.mode === "guided" && methodReveal > 0) {
+            ctx.fillStyle = `rgba(249, 115, 22, ${methodReveal * 0.16})`;
             for (const point of kept) {
               if (point.importance < 0.55) continue;
               ctx.beginPath();
@@ -2187,16 +2189,21 @@
 
           for (const point of kept) {
             if (point.kind === "member") {
-              ctx.fillStyle =
+              const memberAlpha =
                 panel.mode === "guided"
-                  ? "rgba(249, 115, 22, 0.98)"
-                  : "rgba(249, 115, 22, 0.74)";
+                  ? INITIAL_MEMBER_ALPHA +
+                    methodReveal * (0.98 - INITIAL_MEMBER_ALPHA)
+                  : INITIAL_MEMBER_ALPHA;
+              ctx.fillStyle = `rgba(249, 115, 22, ${memberAlpha})`;
               ctx.fillRect(point.x, point.y, 2.6, 2.6);
             } else {
+              const guidedSurfaceAlpha =
+                0.38 + point.importance * 0.22;
               const alpha =
                 panel.mode === "guided"
-                  ? 0.38 + point.importance * 0.22
-                  : 0.62;
+                  ? INITIAL_SURFACE_ALPHA +
+                    methodReveal * (guidedSurfaceAlpha - INITIAL_SURFACE_ALPHA)
+                  : INITIAL_SURFACE_ALPHA;
               ctx.fillStyle = `rgba(45, 212, 191, ${alpha})`;
               ctx.fillRect(point.x, point.y, 2, 2);
             }

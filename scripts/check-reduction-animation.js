@@ -13,6 +13,9 @@ const checks = [
   ["guided ESR target copy", /ESR\s*60%/.test(html)],
   ["guided surface retention copy", /青い面点も残す/.test(html)],
   ["guided member retention target", /const GUIDED_MEMBER_KEEP\s*=\s*0\.6/.test(html)],
+  ["shared initial member alpha", /const INITIAL_MEMBER_ALPHA\s*=\s*0\.74/.test(html)],
+  ["shared initial surface alpha", /const INITIAL_SURFACE_ALPHA\s*=\s*0\.62/.test(html)],
+  ["guided effect delayed from start", /const methodReveal\s*=\s*Math\.max\(0,\s*Math\.min\(1,\s*\(t\s*-\s*0\.08\)\s*\/\s*0\.92\)\)/.test(html)],
   ["importance scoring function", /function scoreImportance/.test(html)],
   ["comparison summary", /同じ軽量化率でも、何を残すかで結果が違う/.test(html)],
 ];

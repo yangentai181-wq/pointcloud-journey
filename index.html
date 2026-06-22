@@ -63,7 +63,7 @@
         min-height: 100dvh;
       }
 
-      /* 日本語の改行を文節単位にして語中での分断・孤立文字を防ぐ */
+      /* Japanese text wrapping */
       .hero h1,
       .lead,
       .stage .sub,
@@ -74,9 +74,10 @@
       .trend-body p,
       .canvas-cap,
       footer .wrap {
-        word-break: auto-phrase;
-        line-break: strict;
-        text-wrap: pretty;
+        word-break: normal;
+        overflow-wrap: break-word;
+        line-break: auto;
+        text-wrap: wrap;
       }
 
       a {
@@ -86,6 +87,9 @@
       }
       a:hover {
         color: var(--teal-dark);
+      }
+      .nowrap {
+        white-space: nowrap;
       }
 
       /* ===== Layout ===== */
@@ -139,7 +143,7 @@
         font-weight: 700;
         margin: 0 0 18px;
         line-height: 1.25;
-        letter-spacing: -0.01em;
+        letter-spacing: 0;
         text-wrap: balance;
       }
       .hero h1 .accent {
@@ -637,7 +641,8 @@
         display: grid;
         gap: 6px;
         overflow-x: hidden;
-        word-break: break-word;
+        word-break: normal;
+        overflow-wrap: break-word;
       }
       .trend-body p {
         margin: 0;
@@ -1096,7 +1101,8 @@
             <div class="canvas-shell">
               <p class="comparison-note">
                 同じ軽量化率でも、何を残すかで結果が違う。削減率
-                70%（点数30%）は左右で同じにして、右はESR 60%で青い面点も残す。
+                70%（点数30%）は左右で同じにして、右はESR
+                60%で<span class="nowrap">青い面点も残す</span>。
               </p>
               <div class="comparison-grid" aria-label="点群リダクション手法の比較">
                 <article class="comparison-panel">
@@ -1104,7 +1110,7 @@
                     <span class="panel-chip">比較対象</span>
                     <h4>単純な間引き</h4>
                     <p>
-                      全体から同じ割合で点を消す。軽くはなるが、柱・梁・エッジも同じ確率で痩せる。
+                      全体から均一に点を減らす。軽くなる一方で、柱・梁・エッジも同じように痩せる。
                     </p>
                   </div>
                   <canvas
@@ -1160,7 +1166,7 @@
                     <span class="panel-chip">提案手法</span>
                     <h4>構造重要度を見た間引き</h4>
                     <p>
-                      点ごとに重要度をつけ、柱・梁・開口まわり・エッジを多めに残す。ただし重要部材だけに寄せず、青い面点も残す。
+                      点ごとの重要度で残す点を選ぶ。柱・梁・開口まわりを多めに残しつつ、青い面点も面全体に散らして残す。
                     </p>
                   </div>
                   <canvas

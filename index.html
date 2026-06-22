@@ -402,21 +402,74 @@
 
       .canvas-shell {
         display: grid;
-        grid-template-columns: 1fr;
         gap: 16px;
       }
-      @media (min-width: 720px) {
-        .canvas-shell {
-          grid-template-columns: 1.4fr 1fr;
-          align-items: center;
+      .comparison-note {
+        margin: 0;
+        border-left: 3px solid var(--orange);
+        padding-left: 12px;
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--text);
+      }
+      .comparison-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 14px;
+      }
+      @media (min-width: 780px) {
+        .comparison-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
       }
-      #decimCanvas {
+      .comparison-panel {
+        min-width: 0;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: #f8fafc;
+        padding: 14px;
+      }
+      .comparison-panel.guided {
+        border-color: rgba(249, 115, 22, 0.55);
+        background: #fff7ed;
+      }
+      .panel-head {
+        min-height: 104px;
+        margin-bottom: 12px;
+      }
+      .panel-chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        margin-bottom: 8px;
+        border-radius: 999px;
+        padding: 3px 9px;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--text-sub);
+        background: #e2e8f0;
+      }
+      .comparison-panel.guided .panel-chip {
+        color: #9a3412;
+        background: var(--orange-soft);
+      }
+      .panel-head h4 {
+        margin: 0 0 6px;
+        font-size: 16px;
+        line-height: 1.4;
+      }
+      .panel-head p {
+        margin: 0;
+        color: var(--text-sub);
+        font-size: 12px;
+        line-height: 1.65;
+      }
+      .comparison-canvas {
         width: 100%;
         height: auto;
         aspect-ratio: 3 / 2;
         background: #0b1220;
-        border-radius: 12px;
+        border-radius: 10px;
         display: block;
       }
       .canvas-cap {
@@ -428,13 +481,14 @@
         text-align: center;
       }
       .canvas-meta .esr-wrap {
-        margin-bottom: 14px;
+        margin-top: 12px;
       }
       .canvas-meta .esr-label {
         font-size: 12px;
         color: var(--text-sub);
         display: flex;
         justify-content: space-between;
+        gap: 12px;
         margin-bottom: 5px;
       }
       .canvas-meta .esr-val {
@@ -470,7 +524,8 @@
         font-weight: 700;
       }
       .replay {
-        margin-top: 16px;
+        justify-self: center;
+        margin-top: 2px;
         font-family: inherit;
         font-size: 12px;
         font-weight: 500;
@@ -1025,10 +1080,10 @@
               >という指標で「間引いても大事な情報がどれだけ残るか」を測る。<b
                 >現時点ではESRで統計的に有意な改善を確認済み（MCR・BPRなど他指標は次フェーズで検証予定）。</b
               >
-              下のアニメは、点を間引いても<span
+              下のアニメは、普通に減らしただけの結果と、重要度を見て減らした結果を並べて比較する。点を間引いても<span
                 style="color: var(--orange); font-weight: 700"
                 >オレンジの柱・梁ライン</span
-              >だけ密度を保つイメージ。
+              >の密度を保てるかが見どころ。
             </p>
             <p
               class="desc"
@@ -1039,53 +1094,122 @@
             </p>
 
             <div class="canvas-shell">
-              <canvas
-                id="decimCanvas"
-                width="600"
-                height="400"
-                aria-label="点の数が減っても柱・梁のラインだけ残るアニメーション"
-              ></canvas>
-              <div class="canvas-meta">
-                <div class="esr-wrap">
-                  <div class="esr-label">
-                    <span>ESR 柱・梁の残存割合（オレンジ）</span
-                    ><span
-                      class="esr-val"
-                      id="esrMember"
-                      style="color: var(--orange)"
-                      >100%</span
-                    >
+              <p class="comparison-note">
+                同じ軽量化率でも、何を残すかで結果が違う。削減率
+                70%（点数30%）は左右で同じにして、ESRだけを比較する。
+              </p>
+              <div class="comparison-grid" aria-label="点群リダクション手法の比較">
+                <article class="comparison-panel">
+                  <div class="panel-head">
+                    <span class="panel-chip">比較対象</span>
+                    <h4>単純な間引き</h4>
+                    <p>
+                      全体から同じ割合で点を消す。軽くはなるが、柱・梁・エッジも同じ確率で痩せる。
+                    </p>
                   </div>
-                  <div class="bar member">
-                    <span id="barMember" style="width: 100%"></span>
+                  <canvas
+                    id="randomCanvas"
+                    class="comparison-canvas"
+                    width="600"
+                    height="400"
+                    aria-label="単純な間引きで柱梁も消えていく点群アニメーション"
+                  ></canvas>
+                  <div class="canvas-meta">
+                    <div class="esr-wrap">
+                      <div class="esr-label">
+                        <span>ESR 重要部材残存率</span
+                        ><span
+                          class="esr-val"
+                          id="randomEsr"
+                          style="color: var(--orange)"
+                          >100%</span
+                        >
+                      </div>
+                      <div class="bar member">
+                        <span id="randomMemberBar" style="width: 100%"></span>
+                      </div>
+                    </div>
+                    <div class="esr-wrap">
+                      <div class="esr-label">
+                        <span>全体の点数</span
+                        ><span
+                          class="esr-val"
+                          id="randomOverall"
+                          style="color: var(--teal)"
+                          >100%</span
+                        >
+                      </div>
+                      <div class="bar overall">
+                        <span id="randomOverallBar" style="width: 100%"></span>
+                      </div>
+                    </div>
+                    <div class="stat-row">
+                      <span>残っている点の数</span><b id="randomPointCount">—</b>
+                    </div>
+                    <div class="stat-row">
+                      <span>削減率</span><b id="randomReduction">0%</b>
+                    </div>
                   </div>
-                </div>
-                <div class="esr-wrap">
-                  <div class="esr-label">
-                    <span>全体の点の数（間引き後）</span
-                    ><span
-                      class="esr-val"
-                      id="esrOverall"
-                      style="color: var(--teal)"
-                      >100%</span
-                    >
+                </article>
+
+                <article class="comparison-panel guided">
+                  <div class="panel-head">
+                    <span class="panel-chip">提案手法</span>
+                    <h4>構造重要度を見た間引き</h4>
+                    <p>
+                      点ごとに重要度をつけ、柱・梁・開口まわり・エッジを優先して残す。
+                    </p>
                   </div>
-                  <div class="bar overall">
-                    <span id="barOverall" style="width: 100%"></span>
+                  <canvas
+                    id="guidedCanvas"
+                    class="comparison-canvas"
+                    width="600"
+                    height="400"
+                    aria-label="提案手法で重要部材を残しながら点数を減らす点群アニメーション"
+                  ></canvas>
+                  <div class="canvas-meta">
+                    <div class="esr-wrap">
+                      <div class="esr-label">
+                        <span>ESR 重要部材残存率</span
+                        ><span
+                          class="esr-val"
+                          id="guidedEsr"
+                          style="color: var(--orange)"
+                          >100%</span
+                        >
+                      </div>
+                      <div class="bar member">
+                        <span id="guidedMemberBar" style="width: 100%"></span>
+                      </div>
+                    </div>
+                    <div class="esr-wrap">
+                      <div class="esr-label">
+                        <span>全体の点数</span
+                        ><span
+                          class="esr-val"
+                          id="guidedOverall"
+                          style="color: var(--teal)"
+                          >100%</span
+                        >
+                      </div>
+                      <div class="bar overall">
+                        <span id="guidedOverallBar" style="width: 100%"></span>
+                      </div>
+                    </div>
+                    <div class="stat-row">
+                      <span>残っている点の数</span><b id="guidedPointCount">—</b>
+                    </div>
+                    <div class="stat-row">
+                      <span>削減率</span><b id="guidedReduction">0%</b>
+                    </div>
                   </div>
-                </div>
-                <div class="stat-row">
-                  <span>残っている点の数</span><b id="ptCount">—</b>
-                </div>
-                <div class="stat-row">
-                  <span>どれだけ軽くなったか</span><b id="compRatio">1.0 : 1</b>
-                </div>
-                <button class="replay" id="replayBtn" type="button">
-                  ▶ もう一度間引く
-                </button>
+                </article>
               </div>
+              <button class="replay" id="replayBtn" type="button">
+                ▶ 比較をもう一度見る
+              </button>
               <p class="canvas-cap">
-                teal＝表面の点（間引かれて減る）／ orange＝柱・梁（密度を保つ）
+                teal＝表面点 / orange＝柱・梁・エッジ。右は重要度スコアを使い、同じ点数まで減らしても重要部材を濃く残す。
               </p>
             </div>
 
@@ -1823,153 +1947,323 @@
       );
       document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
 
-      // ===== Decimation mini-animation =====
+      // ===== Decimation comparison animation =====
       (function () {
-        const canvas = document.getElementById("decimCanvas");
-        const ctx = canvas.getContext("2d");
-        const W = canvas.width,
-          H = canvas.height;
+        const randomCanvas = document.getElementById("randomCanvas");
+        const guidedCanvas = document.getElementById("guidedCanvas");
+        if (!randomCanvas || !guidedCanvas) return;
+        const decimSection = document.getElementById("decim");
 
-        // Build a synthetic "building" point set:
-        //  - background cloud (teal, generic surface points) -> heavily decimated
-        //  - member lines (orange, structural members: posts/beams) -> kept dense
-        const bg = []; // {x,y}
-        const member = []; // {x,y}
-
-        // generic surface points (wall texture-ish noise)
-        for (let i = 0; i < 1400; i++) {
-          bg.push({ x: Math.random() * W, y: Math.random() * H });
-        }
-        // structural members: a simple frame (two posts + two beams + a diagonal)
-        function addLine(x1, y1, x2, y2, n) {
-          for (let i = 0; i < n; i++) {
-            const t = i / (n - 1);
-            const jx = (Math.random() - 0.5) * 6;
-            const jy = (Math.random() - 0.5) * 6;
-            member.push({
-              x: x1 + (x2 - x1) * t + jx,
-              y: y1 + (y2 - y1) * t + jy,
-            });
-          }
-        }
-        const m = 0.12; // margin factor
-        addLine(W * 0.22, H * 0.12, W * 0.22, H * 0.9, 180); // left post
-        addLine(W * 0.78, H * 0.12, W * 0.78, H * 0.9, 180); // right post
-        addLine(W * 0.22, H * 0.12, W * 0.78, H * 0.12, 150); // top beam
-        addLine(W * 0.22, H * 0.55, W * 0.78, H * 0.55, 150); // mid beam
-        addLine(W * 0.22, H * 0.9, W * 0.78, H * 0.55, 130); // diagonal brace
-
-        const bgTotal = bg.length;
-        const memberTotal = member.length;
-
-        const esrMemberEl = document.getElementById("esrMember");
-        const esrOverallEl = document.getElementById("esrOverall");
-        const barMemberEl = document.getElementById("barMember");
-        const barOverallEl = document.getElementById("barOverall");
-        const ptCountEl = document.getElementById("ptCount");
-        const compRatioEl = document.getElementById("compRatio");
-        const replayBtn = document.getElementById("replayBtn");
-
-        let raf = null;
-        let startTime = null;
-        const DURATION = 3200; // ms
+        const W = randomCanvas.width;
+        const H = randomCanvas.height;
+        const FINAL_KEEP = 0.3;
+        const DURATION = 3600;
         const reduceMotion = window.matchMedia(
           "(prefers-reduced-motion: reduce)",
         ).matches;
 
-        function draw(bgKeep, memberKeep) {
-          ctx.clearRect(0, 0, W, H);
-          // subtle grid background
-          ctx.fillStyle = "#0b1220";
-          ctx.fillRect(0, 0, W, H);
+        const structuralLines = [
+          { x1: 150, y1: 58, x2: 150, y2: 350 },
+          { x1: 450, y1: 58, x2: 450, y2: 350 },
+          { x1: 112, y1: 74, x2: 488, y2: 74 },
+          { x1: 112, y1: 205, x2: 488, y2: 205 },
+          { x1: 112, y1: 350, x2: 488, y2: 350 },
+          { x1: 150, y1: 350, x2: 450, y2: 205 },
+          { x1: 258, y1: 135, x2: 356, y2: 135 },
+          { x1: 258, y1: 246, x2: 356, y2: 246 },
+          { x1: 258, y1: 135, x2: 258, y2: 246 },
+          { x1: 356, y1: 135, x2: 356, y2: 246 },
+        ];
 
-          // generic points (teal), keep ratio shrinks aggressively
-          ctx.fillStyle = "rgba(45, 212, 191, 0.75)";
-          const bgN = Math.floor(bgTotal * bgKeep);
-          for (let i = 0; i < bgN; i++) {
-            const p = bg[i];
-            ctx.fillRect(p.x, p.y, 2, 2);
-          }
-
-          // member points (orange), keep ratio stays high
-          ctx.fillStyle = "rgba(249, 115, 22, 0.95)";
-          const mN = Math.floor(memberTotal * memberKeep);
-          for (let i = 0; i < mN; i++) {
-            const p = member[i];
-            ctx.fillRect(p.x, p.y, 2.4, 2.4);
-          }
-          return { bgN, mN };
+        function createRng(seed) {
+          let value = seed >>> 0;
+          return function rand() {
+            value = (value * 1664525 + 1013904223) >>> 0;
+            return value / 4294967296;
+          };
         }
+
+        function distanceToSegment(point, line) {
+          const vx = line.x2 - line.x1;
+          const vy = line.y2 - line.y1;
+          const wx = point.x - line.x1;
+          const wy = point.y - line.y1;
+          const lenSq = vx * vx + vy * vy;
+          const t = Math.max(0, Math.min(1, (wx * vx + wy * vy) / lenSq));
+          const px = line.x1 + t * vx;
+          const py = line.y1 + t * vy;
+          return Math.hypot(point.x - px, point.y - py);
+        }
+
+        function scoreImportance(point) {
+          const nearestMember = Math.min(
+            ...structuralLines.map((line) => distanceToSegment(point, line)),
+          );
+          const memberScore = Math.max(0, 1 - nearestMember / 18) * 0.82;
+          const borderScore =
+            point.x < 112 || point.x > 488 || point.y < 74 || point.y > 350
+              ? 0.1
+              : 0;
+          return Math.min(1, 0.05 + memberScore + borderScore + point.jitter);
+        }
+
+        function buildPoints() {
+          const rand = createRng(20260622);
+          const points = [];
+
+          for (let i = 0; i < 2200; i++) {
+            const x = 100 + rand() * 400;
+            const y = 52 + rand() * 320;
+            points.push({
+              x,
+              y,
+              kind: "surface",
+              jitter: rand() * 0.055,
+              shuffle: rand(),
+            });
+          }
+
+          function addLine(line, count) {
+            for (let i = 0; i < count; i++) {
+              const t = count === 1 ? 0 : i / (count - 1);
+              points.push({
+                x: line.x1 + (line.x2 - line.x1) * t + (rand() - 0.5) * 5.5,
+                y: line.y1 + (line.y2 - line.y1) * t + (rand() - 0.5) * 5.5,
+                kind: "member",
+                jitter: 0.12 + rand() * 0.04,
+                shuffle: rand(),
+              });
+            }
+          }
+
+          structuralLines.forEach((line, index) => {
+            addLine(line, index < 6 ? 92 : 52);
+          });
+
+          points.forEach((point) => {
+            point.importance = scoreImportance(point);
+          });
+
+          [...points]
+            .sort((a, b) => a.shuffle - b.shuffle)
+            .forEach((point, index, ordered) => {
+              point.randomRank = (index + 1) / ordered.length;
+            });
+
+          [...points]
+            .sort((a, b) => b.importance - a.importance || a.shuffle - b.shuffle)
+            .forEach((point, index, ordered) => {
+              point.guidedRank = (index + 1) / ordered.length;
+            });
+
+          return points;
+        }
+
+        const points = buildPoints();
+        const totalPoints = points.length;
+        const memberTotal = points.filter((point) => point.kind === "member").length;
+
+        const panels = [
+          {
+            canvas: randomCanvas,
+            ctx: randomCanvas.getContext("2d"),
+            rank: "randomRank",
+            mode: "random",
+            els: {
+              esr: document.getElementById("randomEsr"),
+              memberBar: document.getElementById("randomMemberBar"),
+              overall: document.getElementById("randomOverall"),
+              overallBar: document.getElementById("randomOverallBar"),
+              pointCount: document.getElementById("randomPointCount"),
+              reduction: document.getElementById("randomReduction"),
+            },
+          },
+          {
+            canvas: guidedCanvas,
+            ctx: guidedCanvas.getContext("2d"),
+            rank: "guidedRank",
+            mode: "guided",
+            els: {
+              esr: document.getElementById("guidedEsr"),
+              memberBar: document.getElementById("guidedMemberBar"),
+              overall: document.getElementById("guidedOverall"),
+              overallBar: document.getElementById("guidedOverallBar"),
+              pointCount: document.getElementById("guidedPointCount"),
+              reduction: document.getElementById("guidedReduction"),
+            },
+          },
+        ];
+
+        const replayBtn = document.getElementById("replayBtn");
+        let raf = null;
+        let fallbackTimer = null;
+        let animating = false;
+        let startTime = null;
 
         function easeInOut(t) {
           return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
         }
 
-        // render one eased-progress step (draw + stats); used by both the
-        // animation loop and the static reduced-motion final frame.
-        function render(t) {
-          // background decays from 1.0 -> 0.12 (heavy decimation)
-          const bgKeep = 1 - t * (1 - 0.12);
-          // member stays nearly full: 1.0 -> 0.94 (ESR high)
-          const memberKeep = 1 - t * (1 - 0.94);
+        function drawReference(ctx) {
+          ctx.fillStyle = "#0b1220";
+          ctx.fillRect(0, 0, W, H);
 
-          const { bgN, mN } = draw(bgKeep, memberKeep);
+          ctx.strokeStyle = "rgba(148, 163, 184, 0.18)";
+          ctx.lineWidth = 1;
+          for (let x = 75; x < W; x += 50) {
+            ctx.beginPath();
+            ctx.moveTo(x, 35);
+            ctx.lineTo(x, H - 30);
+            ctx.stroke();
+          }
+          for (let y = 50; y < H; y += 50) {
+            ctx.beginPath();
+            ctx.moveTo(65, y);
+            ctx.lineTo(W - 65, y);
+            ctx.stroke();
+          }
 
-          const memberPct = Math.round(memberKeep * 100);
-          const overallKept = bgN + mN;
-          const overallPct = Math.round(
-            (overallKept / (bgTotal + memberTotal)) * 100,
-          );
-
-          esrMemberEl.textContent = memberPct + "%";
-          esrOverallEl.textContent = overallPct + "%";
-          barMemberEl.style.width = memberPct + "%";
-          barOverallEl.style.width = overallPct + "%";
-          ptCountEl.textContent = overallKept.toLocaleString() + " pts";
-          const ratio = (bgTotal + memberTotal) / Math.max(1, overallKept);
-          compRatioEl.textContent = ratio.toFixed(1) + " : 1";
+          ctx.strokeStyle = "rgba(255, 237, 213, 0.12)";
+          ctx.lineWidth = 6;
+          structuralLines.forEach((line) => {
+            ctx.beginPath();
+            ctx.moveTo(line.x1, line.y1);
+            ctx.lineTo(line.x2, line.y2);
+            ctx.stroke();
+          });
         }
 
-        function frame(ts) {
+        function drawPanel(panel, keepRatio, t) {
+          const ctx = panel.ctx;
+          drawReference(ctx);
+
+          const kept = [];
+          let memberKept = 0;
+
+          for (const point of points) {
+            if (point[panel.rank] > keepRatio) continue;
+            kept.push(point);
+            if (point.kind === "member") memberKept += 1;
+          }
+
+          if (panel.mode === "guided") {
+            const glow = Math.min(1, t * 2.4);
+            ctx.fillStyle = `rgba(249, 115, 22, ${0.08 + glow * 0.12})`;
+            for (const point of kept) {
+              if (point.importance < 0.55) continue;
+              ctx.beginPath();
+              ctx.arc(point.x, point.y, 4.8, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+
+          for (const point of kept) {
+            if (point.kind === "member") {
+              ctx.fillStyle =
+                panel.mode === "guided"
+                  ? "rgba(249, 115, 22, 0.98)"
+                  : "rgba(249, 115, 22, 0.74)";
+              ctx.fillRect(point.x, point.y, 2.6, 2.6);
+            } else {
+              const alpha =
+                panel.mode === "guided"
+                  ? 0.38 + point.importance * 0.22
+                  : 0.62;
+              ctx.fillStyle = `rgba(45, 212, 191, ${alpha})`;
+              ctx.fillRect(point.x, point.y, 2, 2);
+            }
+          }
+
+          const overallPct = Math.round((kept.length / totalPoints) * 100);
+          const memberPct = Math.round((memberKept / memberTotal) * 100);
+          const reductionPct = Math.max(0, 100 - overallPct);
+
+          panel.els.esr.textContent = memberPct + "%";
+          panel.els.memberBar.style.width = memberPct + "%";
+          panel.els.overall.textContent = overallPct + "%";
+          panel.els.overallBar.style.width = overallPct + "%";
+          panel.els.pointCount.textContent = kept.length.toLocaleString() + " pts";
+          panel.els.reduction.textContent = reductionPct + "%";
+          panel.canvas.dataset.renderedPoints = String(kept.length);
+          panel.canvas.dataset.renderedMembers = String(memberKept);
+        }
+
+        function render(t) {
+          const keepRatio = 1 - t * (1 - FINAL_KEEP);
+          panels.forEach((panel) => drawPanel(panel, keepRatio, t));
+        }
+
+        function stopAnimation() {
+          animating = false;
+          if (raf) cancelAnimationFrame(raf);
+          if (fallbackTimer) window.clearInterval(fallbackTimer);
+          raf = null;
+          fallbackTimer = null;
+        }
+
+        function renderAt(ts) {
           if (!startTime) startTime = ts;
           const raw = Math.min(1, (ts - startTime) / DURATION);
           render(easeInOut(raw));
-          if (raw < 1) {
-            raf = requestAnimationFrame(frame);
-          }
+          if (raw >= 1) stopAnimation();
+          return raw < 1;
+        }
+
+        function frame(ts) {
+          if (!animating) return;
+          if (renderAt(ts)) raf = requestAnimationFrame(frame);
+        }
+
+        function fallbackFrame() {
+          if (!animating) return;
+          renderAt(performance.now());
         }
 
         function play() {
-          // reduced-motion: jump straight to the decimated final frame
+          stopAnimation();
           if (reduceMotion) {
-            if (raf) cancelAnimationFrame(raf);
             render(1);
             return;
           }
-          if (raf) cancelAnimationFrame(raf);
+          animating = true;
           startTime = null;
           raf = requestAnimationFrame(frame);
+          fallbackTimer = window.setInterval(fallbackFrame, 80);
         }
 
-        // draw initial full state
-        draw(1, 1);
-        ptCountEl.textContent =
-          (bgTotal + memberTotal).toLocaleString() + " pts";
+        render(0);
 
-        // fire when the decim section scrolls into view (once), via its own observer
         let played = false;
+        function startOnce() {
+          if (played) return;
+          played = true;
+          window.removeEventListener("scroll", startWhenVisible);
+          window.removeEventListener("resize", startWhenVisible);
+          play();
+        }
+
+        function startWhenVisible() {
+          const rect = decimSection.getBoundingClientRect();
+          const nearViewport =
+            rect.top < window.innerHeight * 0.95 &&
+            rect.bottom > window.innerHeight * 0.1;
+          if (nearViewport) startOnce();
+        }
+
         const decimIO = new IntersectionObserver(
           (entries) => {
-            entries.forEach((e) => {
-              if (e.isIntersecting && !played) {
-                played = true;
-                play();
-              }
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) startOnce();
             });
           },
-          { threshold: 0.45 },
+          { threshold: 0.35 },
         );
-        decimIO.observe(canvas);
+        decimIO.observe(decimSection);
+        window.addEventListener("scroll", startWhenVisible, { passive: true });
+        window.addEventListener("resize", startWhenVisible);
+        startWhenVisible();
+        window.setTimeout(startWhenVisible, 300);
+        window.setTimeout(startWhenVisible, 1200);
 
         replayBtn.addEventListener("click", play);
       })();

@@ -16,6 +16,10 @@ const checks = [
   ["shared initial member alpha", /const INITIAL_MEMBER_ALPHA\s*=\s*0\.74/.test(html)],
   ["shared initial surface alpha", /const INITIAL_SURFACE_ALPHA\s*=\s*0\.62/.test(html)],
   ["guided effect delayed from start", /const methodReveal\s*=\s*Math\.max\(0,\s*Math\.min\(1,\s*\(t\s*-\s*0\.08\)\s*\/\s*0\.92\)\)/.test(html)],
+  ["distributed guided surface selector", /function selectVisibleSurfacePoints/.test(html)],
+  ["guided breakdown metric", /id="guidedBreakdown"/.test(html)],
+  ["surface render telemetry", /dataset\.renderedSurface/.test(html)],
+  ["shared visible surface alpha", /const surfaceAlpha\s*=\s*INITIAL_SURFACE_ALPHA/.test(html)],
   ["importance scoring function", /function scoreImportance/.test(html)],
   ["comparison summary", /同じ軽量化率でも、何を残すかで結果が違う/.test(html)],
 ];

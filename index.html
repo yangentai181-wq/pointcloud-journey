@@ -1147,6 +1147,9 @@
                       <span>残っている点の数</span><b id="randomPointCount">—</b>
                     </div>
                     <div class="stat-row">
+                      <span>内訳（面点 / 部材）</span><b id="randomBreakdown">—</b>
+                    </div>
+                    <div class="stat-row">
                       <span>削減率</span><b id="randomReduction">0%</b>
                     </div>
                   </div>
@@ -1198,6 +1201,9 @@
                     </div>
                     <div class="stat-row">
                       <span>残っている点の数</span><b id="guidedPointCount">—</b>
+                    </div>
+                    <div class="stat-row">
+                      <span>内訳（面点 / 部材）</span><b id="guidedBreakdown">—</b>
                     </div>
                     <div class="stat-row">
                       <span>削減率</span><b id="guidedReduction">0%</b>
@@ -2010,6 +2016,41 @@
           return Math.min(1, 0.05 + memberScore + borderScore + point.jitter);
         }
 
+        function selectVisibleSurfacePoints(surfacePoints, target) {
+          const cols = 10;
+          const rows = 7;
+          const buckets = Array.from({ length: cols * rows }, () => []);
+
+          for (const point of surfacePoints) {
+            const col = Math.max(
+              0,
+              Math.min(cols - 1, Math.floor(((point.x - 100) / 400) * cols)),
+            );
+            const row = Math.max(
+              0,
+              Math.min(rows - 1, Math.floor(((point.y - 52) / 320) * rows)),
+            );
+            buckets[row * cols + col].push(point);
+          }
+
+          buckets.forEach((bucket) => {
+            bucket.sort(
+              (a, b) => a.importance - b.importance || a.shuffle - b.shuffle,
+            );
+          });
+
+          const selected = [];
+          let cursor = 0;
+          while (selected.length < target && buckets.some((bucket) => bucket.length)) {
+            const bucket = buckets[cursor % buckets.length];
+            const point = bucket.shift();
+            if (point) selected.push(point);
+            cursor += 1;
+          }
+
+          return selected;
+        }
+
         function buildPoints() {
           const rand = createRng(20260622);
           const points = [];
@@ -2056,9 +2097,7 @@
           const memberPoints = points
             .filter((point) => point.kind === "member")
             .sort((a, b) => b.importance - a.importance || a.shuffle - b.shuffle);
-          const surfacePoints = points
-            .filter((point) => point.kind === "surface")
-            .sort((a, b) => b.importance - a.importance || a.shuffle - b.shuffle);
+          const surfacePoints = points.filter((point) => point.kind === "surface");
           const finalPointTarget = Math.round(points.length * FINAL_KEEP);
           const finalMemberTarget = Math.round(
             memberPoints.length * GUIDED_MEMBER_KEEP,
@@ -2067,9 +2106,13 @@
             0,
             finalPointTarget - finalMemberTarget,
           );
+          const selectedSurfacePoints = selectVisibleSurfacePoints(
+            surfacePoints,
+            finalSurfaceTarget,
+          );
           const selectedGuided = [
             ...memberPoints.slice(0, finalMemberTarget),
-            ...surfacePoints.slice(0, finalSurfaceTarget),
+            ...selectedSurfacePoints,
           ].sort((a, b) => b.importance - a.importance || a.shuffle - b.shuffle);
           const selectedSet = new Set(selectedGuided);
           const removedGuided = points
@@ -2105,6 +2148,7 @@
               overall: document.getElementById("randomOverall"),
               overallBar: document.getElementById("randomOverallBar"),
               pointCount: document.getElementById("randomPointCount"),
+              breakdown: document.getElementById("randomBreakdown"),
               reduction: document.getElementById("randomReduction"),
             },
           },
@@ -2119,6 +2163,7 @@
               overall: document.getElementById("guidedOverall"),
               overallBar: document.getElementById("guidedOverallBar"),
               pointCount: document.getElementById("guidedPointCount"),
+              breakdown: document.getElementById("guidedBreakdown"),
               reduction: document.getElementById("guidedReduction"),
             },
           },
@@ -2170,19 +2215,21 @@
 
           const kept = [];
           let memberKept = 0;
+          let surfaceKept = 0;
 
           for (const point of points) {
             if (point[panel.rank] > keepRatio) continue;
             kept.push(point);
             if (point.kind === "member") memberKept += 1;
+            if (point.kind === "surface") surfaceKept += 1;
           }
 
           if (panel.mode === "guided" && methodReveal > 0) {
-            ctx.fillStyle = `rgba(249, 115, 22, ${methodReveal * 0.16})`;
+            ctx.fillStyle = `rgba(249, 115, 22, ${methodReveal * 0.06})`;
             for (const point of kept) {
               if (point.importance < 0.55) continue;
               ctx.beginPath();
-              ctx.arc(point.x, point.y, 4.8, 0, Math.PI * 2);
+              ctx.arc(point.x, point.y, 3.6, 0, Math.PI * 2);
               ctx.fill();
             }
           }
@@ -2192,20 +2239,15 @@
               const memberAlpha =
                 panel.mode === "guided"
                   ? INITIAL_MEMBER_ALPHA +
-                    methodReveal * (0.98 - INITIAL_MEMBER_ALPHA)
+                    methodReveal * (0.9 - INITIAL_MEMBER_ALPHA)
                   : INITIAL_MEMBER_ALPHA;
               ctx.fillStyle = `rgba(249, 115, 22, ${memberAlpha})`;
               ctx.fillRect(point.x, point.y, 2.6, 2.6);
             } else {
-              const guidedSurfaceAlpha =
-                0.38 + point.importance * 0.22;
-              const alpha =
-                panel.mode === "guided"
-                  ? INITIAL_SURFACE_ALPHA +
-                    methodReveal * (guidedSurfaceAlpha - INITIAL_SURFACE_ALPHA)
-                  : INITIAL_SURFACE_ALPHA;
+              const surfaceAlpha = INITIAL_SURFACE_ALPHA;
+              const alpha = surfaceAlpha;
               ctx.fillStyle = `rgba(45, 212, 191, ${alpha})`;
-              ctx.fillRect(point.x, point.y, 2, 2);
+              ctx.fillRect(point.x, point.y, 2.2, 2.2);
             }
           }
 
@@ -2218,9 +2260,12 @@
           panel.els.overall.textContent = overallPct + "%";
           panel.els.overallBar.style.width = overallPct + "%";
           panel.els.pointCount.textContent = kept.length.toLocaleString() + " pts";
+          panel.els.breakdown.textContent =
+            surfaceKept.toLocaleString() + " / " + memberKept.toLocaleString();
           panel.els.reduction.textContent = reductionPct + "%";
           panel.canvas.dataset.renderedPoints = String(kept.length);
           panel.canvas.dataset.renderedMembers = String(memberKept);
+          panel.canvas.dataset.renderedSurface = String(surfaceKept);
         }
 
         function render(t) {

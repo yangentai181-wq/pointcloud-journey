@@ -10,6 +10,9 @@ const checks = [
   ["random ESR metric", /id="randomEsr"/.test(html)],
   ["guided ESR metric", /id="guidedEsr"/.test(html)],
   ["shared reduction copy", /削減率\s*70%/.test(html)],
+  ["guided ESR target copy", /ESR\s*60%/.test(html)],
+  ["guided surface retention copy", /青い面点も残す/.test(html)],
+  ["guided member retention target", /const GUIDED_MEMBER_KEEP\s*=\s*0\.6/.test(html)],
   ["importance scoring function", /function scoreImportance/.test(html)],
   ["comparison summary", /同じ軽量化率でも、何を残すかで結果が違う/.test(html)],
 ];

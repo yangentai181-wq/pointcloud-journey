@@ -1096,7 +1096,7 @@
             <div class="canvas-shell">
               <p class="comparison-note">
                 同じ軽量化率でも、何を残すかで結果が違う。削減率
-                70%（点数30%）は左右で同じにして、ESRだけを比較する。
+                70%（点数30%）は左右で同じにして、右はESR 60%で青い面点も残す。
               </p>
               <div class="comparison-grid" aria-label="点群リダクション手法の比較">
                 <article class="comparison-panel">
@@ -1157,7 +1157,7 @@
                     <span class="panel-chip">提案手法</span>
                     <h4>構造重要度を見た間引き</h4>
                     <p>
-                      点ごとに重要度をつけ、柱・梁・開口まわり・エッジを優先して残す。
+                      点ごとに重要度をつけ、柱・梁・開口まわり・エッジを多めに残す。ただし重要部材だけに寄せず、青い面点も残す。
                     </p>
                   </div>
                   <canvas
@@ -1209,7 +1209,7 @@
                 ▶ 比較をもう一度見る
               </button>
               <p class="canvas-cap">
-                teal＝表面点 / orange＝柱・梁・エッジ。右は重要度スコアを使い、同じ点数まで減らしても重要部材を濃く残す。
+                teal＝表面点 / orange＝柱・梁・エッジ。右は重要度スコアを使い、同じ点数まで減らしながら重要部材残存率を60%に保つ。
               </p>
             </div>
 
@@ -1957,6 +1957,7 @@
         const W = randomCanvas.width;
         const H = randomCanvas.height;
         const FINAL_KEEP = 0.3;
+        const GUIDED_MEMBER_KEEP = 0.6;
         const DURATION = 3600;
         const reduceMotion = window.matchMedia(
           "(prefers-reduced-motion: reduce)",
@@ -2050,11 +2051,38 @@
               point.randomRank = (index + 1) / ordered.length;
             });
 
-          [...points]
-            .sort((a, b) => b.importance - a.importance || a.shuffle - b.shuffle)
-            .forEach((point, index, ordered) => {
-              point.guidedRank = (index + 1) / ordered.length;
-            });
+          const memberPoints = points
+            .filter((point) => point.kind === "member")
+            .sort((a, b) => b.importance - a.importance || a.shuffle - b.shuffle);
+          const surfacePoints = points
+            .filter((point) => point.kind === "surface")
+            .sort((a, b) => b.importance - a.importance || a.shuffle - b.shuffle);
+          const finalPointTarget = Math.round(points.length * FINAL_KEEP);
+          const finalMemberTarget = Math.round(
+            memberPoints.length * GUIDED_MEMBER_KEEP,
+          );
+          const finalSurfaceTarget = Math.max(
+            0,
+            finalPointTarget - finalMemberTarget,
+          );
+          const selectedGuided = [
+            ...memberPoints.slice(0, finalMemberTarget),
+            ...surfacePoints.slice(0, finalSurfaceTarget),
+          ].sort((a, b) => b.importance - a.importance || a.shuffle - b.shuffle);
+          const selectedSet = new Set(selectedGuided);
+          const removedGuided = points
+            .filter((point) => !selectedSet.has(point))
+            .sort((a, b) => b.importance - a.importance || a.shuffle - b.shuffle);
+
+          selectedGuided.forEach((point, index) => {
+            point.guidedRank =
+              ((index + 1) / (selectedGuided.length + 1)) * FINAL_KEEP;
+          });
+          removedGuided.forEach((point, index) => {
+            point.guidedRank =
+              FINAL_KEEP +
+              ((index + 1) / (removedGuided.length + 1)) * (1 - FINAL_KEEP);
+          });
 
           return points;
         }
